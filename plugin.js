@@ -760,10 +760,10 @@ a.phabricator-remarkup-embed-image img{background:white;}
       .replace(/^(\s*[-+]\s)/gm, function (a) { return '<marker class="dash">' + a + '</marker>'; })
       /* Numbered lists */
       .replace(/\W(\d+\.\s)/gm, function (a) { return '<marker class="num">' + a + '</marker>'; })
-      /* Curly brace references {F123}, {icon ...}, etc. */
-      .replace(/\{.*?\}/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
-      /* Square bracket links [[wiki]], [text](url) */
-      .replace(/\[.*?\]/g, function (a) { return '<marker class="bord">' + a + '</marker>'; });
+      /* Curly brace references {F123}, {icon ...}, {tex c_{mq}} — supports one level of nesting */
+      .replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
+      /* Square bracket links [[wiki]], [text](url) — supports one level of nesting */
+      .replace(/\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]/g, function (a) { return '<marker class="bord">' + a + '</marker>'; });
   }
 
   document.getElementById('_PHE_SYNTAX').addEventListener('click', function () {
