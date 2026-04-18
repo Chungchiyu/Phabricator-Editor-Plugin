@@ -724,9 +724,9 @@ a.phabricator-remarkup-embed-image img{background:white;}
         if (ta.className.includes('PhabricatorMonospaced')) {
           $.backdrop = document.createElement('div');
           $.backdrop.className = 'phe-bd';
-          $.backdrop.style.padding = '18px 20px';
           $.backdrop.innerHTML = '<div id="_PHE_HL"></div>';
           ta.parentElement.insertBefore($.backdrop, ta);
+          syncBackdropStyles(ta, $.backdrop);
           ta.addEventListener('input', function () { var h = document.getElementById('_PHE_HL'); if (h) h.innerHTML = hlText(ta.value); });
           ta.dispatchEvent(new Event('input'));
           ta.addEventListener('scroll', function () { if ($.backdrop) $.backdrop.scrollTop = ta.scrollTop; });
