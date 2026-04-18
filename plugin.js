@@ -97,10 +97,24 @@ a.phabricator-remarkup-embed-image img{background:white;}
 #_PHE_TBLMOD{position:fixed;top:10%;left:50%;transform:translateX(-50%);width:82%;
   max-height:80%;z-index:999999;background:${BG};border:1px solid ${BORDER};
   border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.35);overflow:auto;display:none;padding:12px;}
-#_PHE_TBLMOD table{border-collapse:collapse;}
-#_PHE_TBLMOD td{border:1px solid ${BORDER};padding:0;min-width:130px;vertical-align:top;}
-#_PHE_TBLMOD td textarea{width:100%;box-sizing:border-box;padding:4px;border:none;outline:none;
-  resize:both;background:transparent;color:${TEXT};font-size:13px;}
+#_PHE_TBLMOD .tm-header{display:flex;align-items:center;justify-content:space-between;
+  padding:0 0 10px;margin-bottom:10px;border-bottom:1px solid ${BORDER};}
+#_PHE_TBLMOD .tm-title{font-size:14px;font-weight:600;color:${TEXT};}
+#_PHE_TBLMOD .tm-info{font-size:11px;opacity:.6;color:${TEXT};margin-left:8px;}
+#_PHE_TBLMOD .tm-header-actions{display:flex;gap:6px;}
+#_PHE_TBLMOD table{border-collapse:collapse;table-layout:auto;width:100%;}
+#_PHE_TBLMOD td{border:1px solid ${BORDER};padding:0;min-width:60px;vertical-align:top;}
+#_PHE_TBLMOD td textarea{width:100%;box-sizing:border-box;padding:4px 8px;border:none;outline:none;
+  resize:none;background:transparent;color:${TEXT};font-size:13px;overflow:hidden;}
+#_PHE_TBLMOD tr.phe-tbl-hdr td{background:${LIGHT ? '#e8eaed' : '#2a3040'};}
+#_PHE_TBLMOD tr.phe-tbl-hdr td textarea{font-weight:600;}
+#_PHE_TBLMOD .tm-del-col{cursor:pointer;opacity:.3;font-size:10px;text-align:center;
+  padding:2px 0;color:${TEXT};transition:opacity .15s;}
+#_PHE_TBLMOD .tm-del-col:hover{opacity:1;color:#e74c3c;}
+#_PHE_TBLMOD .tm-del-row{cursor:pointer;opacity:.3;font-size:10px;text-align:center;
+  padding:0 4px;color:${TEXT};transition:opacity .15s;border:1px solid ${BORDER};
+  vertical-align:middle;min-width:auto;width:22px;}
+#_PHE_TBLMOD .tm-del-row:hover{opacity:1;color:#e74c3c;}
 #_PHE_TBLMOD .tm-btns{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;}
 .phui-timeline-extra .block-id{margin-left:5px;border:1px solid #888;border-radius:3px;font-size:11px;padding:1px 4px;cursor:pointer;}
 .phui-timeline-extra .block-id.show-copied{background:#27ae60;color:#fff;border-color:#27ae60;}
@@ -927,10 +941,13 @@ a.phabricator-remarkup-embed-image img{background:white;}
 
   (function () {
     var TR = /^\s*\|(?:[^|]+\|)+\s*$/, oRange = null, oTA = null;
+    var SEP_RE = /^\s*-{3,}\s*$/;
     var tBtn = document.createElement('button'); tBtn.id = '_PHE_TBLBTN'; tBtn.textContent = 'Table Editor';
     var tMd = document.createElement('div'); tMd.id = '_PHE_TBLMOD';
     document.body.appendChild(tBtn); document.body.appendChild(tMd);
     function isTable(t) { var ls = t.trim().split('\n'); return ls.length > 0 && ls.every(function (l) { return TR.test(l); }); }
+    /* Detect if a parsed row is a header separator (all cells are 3+ dashes) */
+    function isSepRow(row) { return row.every(function (c) { return SEP_RE.test(c); }); }
     window.addEventListener('mouseup', function (e) {
       if (document.activeElement.type !== 'textarea') return;
       setTimeout(function () {
@@ -941,21 +958,212 @@ a.phabricator-remarkup-embed-image img{background:white;}
     });
     tBtn.addEventListener('click', function () {
       if (!oRange || !isTable(oRange.originalText)) return;
-      buildMod(oRange.originalText.trim().split('\n').map(function (r) { return r.trim().split('|').filter(function (c) { return c !== ''; }).map(function (c) { return c.trim(); }); })); tBtn.style.display = 'none';
+      var parsed = oRange.originalText.trim().split('\n').map(function (r) {
+        return r.trim().split('|').filter(function (c) { return c !== ''; }).map(function (c) { return c.trim(); });
+      });
+      /* Detect and strip header separator row (row where all cells are ---+) */
+      var hasHeader = false;
+      if (parsed.length >= 2 && isSepRow(parsed[1])) {
+        hasHeader = true;
+        parsed.splice(1, 1);
+      }
+      buildMod(parsed, hasHeader);
+      tBtn.style.display = 'none';
     });
     function replaceWith(text) { text = text.replace(/(\n)(?=[^|])/g, ''); oTA.setRangeText(text, oRange.selectionStart, oRange.selectionEnd, 'select'); }
-    function buildMod(data) {
-      tMd.innerHTML = ''; tMd.style.display = 'block'; var tbl = document.createElement('table');
-      var ro = new ResizeObserver(function (entries) { entries.forEach(function (entry) { var el = entry.target; var r = el.dataset.row, c = el.dataset.col; Array.from(tbl.rows).forEach(function (row) { var cell = row.cells[c]; if (cell) { var t = cell.querySelector('textarea'); if (t && t !== el) t.style.width = el.offsetWidth + 'px'; } }); Array.from(tbl.rows[r].cells).forEach(function (cell) { var t = cell.querySelector('textarea'); if (t && t !== el) t.style.height = el.offsetHeight + 'px'; }); }); });
-      function mkCell(text, r, c) { var td = document.createElement('td'), ta = document.createElement('textarea'); ta.value = text.replace(/\{newline\}/g, '{newline}\n'); ta.dataset.row = r; ta.dataset.col = c; ta.addEventListener('input', function () { if (ta.scrollHeight > ta.clientHeight) { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 20) + 'px'; } }); ro.observe(ta); td.appendChild(ta); return td; }
-      data.forEach(function (row, ri) { var tr = document.createElement('tr'); row.forEach(function (cell, ci) { tr.appendChild(mkCell(cell, ri, ci)); }); tbl.appendChild(tr); });
+
+    function buildMod(data, hasHeader) {
+      tMd.innerHTML = ''; tMd.style.display = 'block';
+
+      /* ── Modal header ── */
+      var header = document.createElement('div'); header.className = 'tm-header';
+      var titleWrap = document.createElement('div');
+      var titleEl = document.createElement('span'); titleEl.className = 'tm-title'; titleEl.textContent = '📊 Table Editor';
+      var infoEl = document.createElement('span'); infoEl.className = 'tm-info';
+      titleWrap.appendChild(titleEl); titleWrap.appendChild(infoEl);
+      var headerActions = document.createElement('div'); headerActions.className = 'tm-header-actions';
+      header.appendChild(titleWrap); header.appendChild(headerActions);
+      tMd.appendChild(header);
+
+      /* ── Save / Discard in header actions ── */
+      var saveBtn = document.createElement('button'); saveBtn.textContent = '💾 Save'; saveBtn.className = 'ph-btn save'; saveBtn.style.fontSize = '12px';
+      var discardBtn = document.createElement('button'); discardBtn.textContent = 'Discard'; discardBtn.className = 'ph-btn cancel'; discardBtn.style.fontSize = '12px';
+      discardBtn.addEventListener('click', function () { tMd.style.display = 'none'; });
+      headerActions.appendChild(saveBtn); headerActions.appendChild(discardBtn);
+
+      /* ── Table ── */
+      var tbl = document.createElement('table');
+
+      function autoSize(ta) {
+        ta.style.height = 'auto';
+        ta.style.height = Math.max(ta.scrollHeight, 24) + 'px';
+      }
+
+      function mkCell(text, r, c) {
+        var td = document.createElement('td');
+        var ta = document.createElement('textarea');
+        ta.value = text.replace(/\{newline\}/g, '{newline}\n');
+        ta.rows = 1;
+        ta.dataset.row = r; ta.dataset.col = c;
+        ta.addEventListener('input', function () { autoSize(ta); });
+        td.appendChild(ta);
+        return td;
+      }
+
+      function updateInfo() {
+        var rc = tbl.rows.length - 1; /* -1 for colDelRow */
+        var cc = tbl.rows[1] ? tbl.rows[1].cells.length - 1 : 0; /* -1 for row-delete col */
+        infoEl.textContent = rc + ' rows × ' + cc + ' cols' + (hasHeader ? ' (header)' : '');
+      }
+
+      function rebuildRowIndices() {
+        Array.from(tbl.rows).forEach(function (tr, ri) {
+          if (tr === colDelRow) return;
+          Array.from(tr.cells).forEach(function (td) {
+            var ta = td.querySelector('textarea');
+            if (ta) { ta.dataset.row = ri; }
+          });
+          /* Update header class — first data row (row index 1 in DOM, since 0 is colDelRow) */
+          tr.classList.toggle('phe-tbl-hdr', hasHeader && tr === tbl.rows[1]);
+        });
+      }
+
+      /* ── Column delete buttons row ── */
+      var colDelRow = document.createElement('tr');
+      function buildColDelRow() {
+        colDelRow.innerHTML = '';
+        /* Count columns from first data row (after colDelRow itself), minus the row-delete cell */
+        var firstDataRow = tbl.rows[1];
+        var cc = firstDataRow ? firstDataRow.cells.length - 1 : 0;
+        for (var ci = 0; ci < cc; ci++) {
+          (function (col) {
+            var td = document.createElement('td'); td.className = 'tm-del-col'; td.textContent = '✕';
+            td.title = 'Delete column ' + (col + 1);
+            td.addEventListener('click', function () {
+              /* Check if column has content */
+              var hasContent = false;
+              Array.from(tbl.rows).forEach(function (tr) {
+                if (tr === colDelRow) return;
+                var cell = tr.cells[col + 1]; /* +1 for row-delete column */
+                if (cell) { var ta = cell.querySelector('textarea'); if (ta && ta.value.trim()) hasContent = true; }
+              });
+              if (hasContent && !confirm('Delete column ' + (col + 1) + '? It contains data.')) return;
+              Array.from(tbl.rows).forEach(function (tr) {
+                if (tr === colDelRow) return;
+                var cell = tr.cells[col + 1];
+                if (cell) tr.removeChild(cell);
+              });
+              buildColDelRow();
+              rebuildRowIndices();
+              updateInfo();
+            });
+            colDelRow.appendChild(td);
+          })(ci);
+        }
+        /* Empty corner cell for the row-delete column */
+        var corner = document.createElement('td'); corner.style.border = 'none'; corner.style.minWidth = 'auto';
+        colDelRow.insertBefore(corner, colDelRow.firstChild);
+      }
+
+      /* ── Build data rows ── */
+      data.forEach(function (row, ri) {
+        var tr = document.createElement('tr');
+        if (hasHeader && ri === 0) tr.classList.add('phe-tbl-hdr');
+        /* Row delete button */
+        var delTd = document.createElement('td'); delTd.className = 'tm-del-row'; delTd.textContent = '✕';
+        delTd.title = 'Delete row ' + (ri + 1);
+        delTd.addEventListener('click', function () {
+          var hasContent = false;
+          Array.from(tr.cells).forEach(function (td) {
+            if (td === delTd) return;
+            var ta = td.querySelector('textarea'); if (ta && ta.value.trim()) hasContent = true;
+          });
+          if (hasContent && !confirm('Delete this row? It contains data.')) return;
+          tbl.removeChild(tr);
+          rebuildRowIndices();
+          updateInfo();
+        });
+        tr.appendChild(delTd);
+        row.forEach(function (cell, ci) { tr.appendChild(mkCell(cell, ri, ci)); });
+        tbl.appendChild(tr);
+      });
+
+      buildColDelRow();
+      tbl.insertBefore(colDelRow, tbl.firstChild);
+      tMd.appendChild(tbl);
+
+      /* ── Auto-size all textareas after DOM insertion ── */
+      requestAnimationFrame(function () {
+        tMd.querySelectorAll('textarea').forEach(autoSize);
+      });
+
+      /* ── Toolbar buttons ── */
       var btns = document.createElement('div'); btns.className = 'tm-btns';
-      [['Save', function () { replaceWith(Array.from(tbl.rows).map(function (tr) { return Array.from(tr.cells).map(function (td) { return td.firstChild.value.trim(); }); }).map(function (r) { return '| ' + r.join(' | ') + ' |'; }).join('\n')); tMd.style.display = 'none'; }],
-      ['Discard', function () { tMd.style.display = 'none'; }],
-      ['Insert Row', function () { var cc = tbl.rows[0] ? tbl.rows[0].cells.length : 0, ri = tbl.rows.length; var tr = document.createElement('tr'); for (var c = 0; c < cc; c++)tr.appendChild(mkCell('', ri, c)); tbl.appendChild(tr); }],
-      ['Insert Col', function () { var rc = tbl.rows.length; for (var r = 0; r < rc; r++) { var row = tbl.rows[r]; row.appendChild(mkCell('', r, row.cells.length)); } }]
-      ].forEach(function (pair) { var b = document.createElement('button'); b.textContent = pair[0]; b.className = 'ph-btn'; b.style.fontSize = '12px'; b.addEventListener('click', pair[1]); btns.appendChild(b); });
-      tMd.appendChild(tbl); tMd.appendChild(btns);
+      var hdrBtn = document.createElement('button'); hdrBtn.className = 'ph-btn' + (hasHeader ? ' on' : '');
+      hdrBtn.style.fontSize = '12px'; hdrBtn.textContent = 'Toggle Header';
+      hdrBtn.addEventListener('click', function () {
+        hasHeader = !hasHeader;
+        hdrBtn.classList.toggle('on', hasHeader);
+        rebuildRowIndices();
+        updateInfo();
+      });
+      btns.appendChild(hdrBtn);
+
+      [['+ Row', function () {
+        var cc = tbl.rows[1] ? tbl.rows[1].cells.length - 1 : 0; /* -1 for del col */
+        var ri = tbl.rows.length - 1; /* -1 for colDelRow */
+        var tr = document.createElement('tr');
+        var delTd = document.createElement('td'); delTd.className = 'tm-del-row'; delTd.textContent = '✕';
+        delTd.addEventListener('click', function () {
+          var hasContent = false;
+          Array.from(tr.cells).forEach(function (td) {
+            if (td === delTd) return;
+            var ta = td.querySelector('textarea'); if (ta && ta.value.trim()) hasContent = true;
+          });
+          if (hasContent && !confirm('Delete this row? It contains data.')) return;
+          tbl.removeChild(tr);
+          rebuildRowIndices(); updateInfo();
+        });
+        tr.appendChild(delTd);
+        for (var c = 0; c < cc; c++) tr.appendChild(mkCell('', ri, c));
+        tbl.appendChild(tr);
+        rebuildRowIndices(); updateInfo();
+        requestAnimationFrame(function () { tr.querySelectorAll('textarea').forEach(autoSize); });
+      }],
+      ['+ Col', function () {
+        var ci = tbl.rows[1] ? tbl.rows[1].cells.length - 1 : 0;
+        Array.from(tbl.rows).forEach(function (tr, ri) {
+          if (tr === colDelRow) return;
+          tr.appendChild(mkCell('', ri, ci));
+        });
+        buildColDelRow();
+        tbl.insertBefore(colDelRow, tbl.firstChild);
+        rebuildRowIndices(); updateInfo();
+      }]
+      ].forEach(function (pair) {
+        var b = document.createElement('button'); b.textContent = pair[0]; b.className = 'ph-btn'; b.style.fontSize = '12px';
+        b.addEventListener('click', pair[1]); btns.appendChild(b);
+      });
+      tMd.appendChild(btns);
+
+      /* ── Save handler ── */
+      saveBtn.addEventListener('click', function () {
+        var rows = Array.from(tbl.rows).filter(function (tr) { return tr !== colDelRow; });
+        var lines = rows.map(function (tr) {
+          return Array.from(tr.cells).filter(function (td) { return !td.classList.contains('tm-del-row'); })
+            .map(function (td) { return td.firstChild.value.trim(); });
+        }).map(function (r) { return '| ' + r.join(' | ') + ' |'; });
+        /* Insert header separator after first row if header is active */
+        if (hasHeader && lines.length > 0) {
+          var cc = rows[0] ? rows[0].cells.length - 1 : 1;
+          var sep = '| ' + Array(cc).fill('-----').join(' | ') + ' |';
+          lines.splice(1, 0, sep);
+        }
+        replaceWith(lines.join('\n'));
+        tMd.style.display = 'none';
+      });
+
+      updateInfo();
     }
   })();
 
