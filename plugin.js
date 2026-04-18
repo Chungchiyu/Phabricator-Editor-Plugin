@@ -714,7 +714,11 @@ a.phabricator-remarkup-embed-image img{background:white;}
   }
 
   function hlText(text) {
-    return text.replace(/\n$/g, '\n\n')
+    var escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return escaped.replace(/\n$/g, '\n\n')
       /* Code fences ``` — highlight the fence lines themselves */
       .replace(/^```.*$/gm, function (a) { return '<marker class="codefence">' + a + '</marker>'; })
       /* Inline monospaced `code` */
