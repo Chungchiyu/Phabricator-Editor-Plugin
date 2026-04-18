@@ -604,7 +604,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
       });
       /* Re-capture the preview element after Phabricator updates it */
       var newPv = $.remarkEl.closest('form') ?
-          $.remarkEl.closest('form').querySelector('.remarkup-inline-preview') : null;
+        $.remarkEl.closest('form').querySelector('.remarkup-inline-preview') : null;
       if (newPv) {
         if (newPv !== $.previewEl) {
           /* Preview element changed — clean up old one and rebind observer */
@@ -689,27 +689,27 @@ a.phabricator-remarkup-embed-image img{background:white;}
       (parseFloat(cs.borderLeftWidth) || 0) +
       (parseFloat(cs.borderRightWidth) || 0);
     var scrollbarGutter = Math.max(0, ta.offsetWidth - ta.clientWidth - borderX);
-    el.style.fontFamily    = cs.fontFamily;
-    el.style.fontSize      = cs.fontSize;
-    el.style.fontWeight    = cs.fontWeight;
+    el.style.fontFamily = cs.fontFamily;
+    el.style.fontSize = cs.fontSize;
+    el.style.fontWeight = cs.fontWeight;
     var lh = cs.lineHeight;
-    el.style.lineHeight    = (lh === 'normal')
+    el.style.lineHeight = (lh === 'normal')
       ? measureNormalLineHeight(ta, cs)
       : lh;
     el.style.letterSpacing = cs.letterSpacing;
-    el.style.wordSpacing   = cs.wordSpacing;
-    el.style.textIndent    = cs.textIndent;
-    el.style.paddingTop    = cs.paddingTop;
-    el.style.paddingRight  = ((parseFloat(cs.paddingRight) || 0) + scrollbarGutter) + 'px';
+    el.style.wordSpacing = cs.wordSpacing;
+    el.style.textIndent = cs.textIndent;
+    el.style.paddingTop = cs.paddingTop;
+    el.style.paddingRight = ((parseFloat(cs.paddingRight) || 0) + scrollbarGutter) + 'px';
     el.style.paddingBottom = cs.paddingBottom;
-    el.style.paddingLeft   = cs.paddingLeft;
-    el.style.borderTopWidth    = cs.borderTopWidth;
-    el.style.borderRightWidth  = cs.borderRightWidth;
+    el.style.paddingLeft = cs.paddingLeft;
+    el.style.borderTopWidth = cs.borderTopWidth;
+    el.style.borderRightWidth = cs.borderRightWidth;
     el.style.borderBottomWidth = cs.borderBottomWidth;
-    el.style.borderLeftWidth   = cs.borderLeftWidth;
+    el.style.borderLeftWidth = cs.borderLeftWidth;
 
     el.style.marginTop = bar_cs ? bar_cs.height : '0px';
-    try { el.style.tabSize = cs.tabSize; } catch (_) {}
+    try { el.style.tabSize = cs.tabSize; } catch (_) { }
   }
 
   function hlText(text) {
