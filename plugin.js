@@ -102,7 +102,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
 #_PHE_TBLMOD .tm-title{font-size:14px;font-weight:600;color:${TEXT};}
 #_PHE_TBLMOD .tm-info{font-size:11px;opacity:.6;color:${TEXT};margin-left:8px;}
 #_PHE_TBLMOD .tm-header-actions{display:flex;gap:6px;}
-#_PHE_TBLMOD table{border-collapse:collapse;table-layout:auto;width:100%;}
+#_PHE_TBLMOD table{border-collapse:collapse;table-layout:fixed;width:100%;}
 #_PHE_TBLMOD td{border:1px solid ${BORDER};padding:0;min-width:60px;vertical-align:top;}
 #_PHE_TBLMOD td textarea{width:100%;box-sizing:border-box;padding:4px 8px;border:none;outline:none;
   resize:none;background:transparent;color:${TEXT};font-size:13px;overflow:hidden;}
@@ -1092,10 +1092,57 @@ a.phabricator-remarkup-embed-image img{background:white;}
       tbl.insertBefore(colDelRow, tbl.firstChild);
       tMd.appendChild(tbl);
 
-      /* ── Auto-size all textareas after DOM insertion ── */
+      /* ── Auto-size after DOM insertion: widths first, then heights ── */
       requestAnimationFrame(function () {
+        redistributeColWidths();
         tMd.querySelectorAll('textarea').forEach(autoSize);
       });
+
+      /* ── Measure max content width per column and set proportional col widths ── */
+      function redistributeColWidths() {
+        var dataRows = Array.from(tbl.rows).filter(function (tr) { return tr !== colDelRow; });
+        if (!dataRows.length) return;
+        var cc = dataRows[0].cells.length - 1; /* -1 for row-delete col */
+        if (cc <= 0) return;
+
+        /* Hidden measuring element */
+        var ruler = document.createElement('span');
+        ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:0 8px;';
+        document.body.appendChild(ruler);
+
+        var maxWidths = [];
+        for (var ci = 0; ci < cc; ci++) {
+          var maxW = 60; /* minimum floor */
+          dataRows.forEach(function (tr) {
+            var td = tr.cells[ci + 1]; /* +1 for row-delete col */
+            if (!td) return;
+            var ta = td.querySelector('textarea');
+            if (!ta) return;
+            /* Measure the longest line in this cell */
+            var lines = ta.value.split('\n');
+            lines.forEach(function (line) {
+              ruler.textContent = line;
+              var w = ruler.offsetWidth + 20; /* +20 for padding */
+              if (w > maxW) maxW = w;
+            });
+          });
+          maxWidths.push(Math.min(maxW, 500)); /* cap at 500px */
+        }
+        document.body.removeChild(ruler);
+
+        /* Set proportional widths via colgroup */
+        var totalW = maxWidths.reduce(function (sum, w) { return sum + w; }, 0);
+        var cg = tbl.querySelector('colgroup');
+        if (!cg) { cg = document.createElement('colgroup'); tbl.insertBefore(cg, tbl.firstChild); }
+        cg.innerHTML = '';
+        /* First col: row-delete column (fixed narrow) */
+        var delCol = document.createElement('col'); delCol.style.width = '22px'; cg.appendChild(delCol);
+        maxWidths.forEach(function (w) {
+          var col = document.createElement('col');
+          col.style.width = Math.max(Math.round((w / totalW) * 100), 5) + '%';
+          cg.appendChild(col);
+        });
+      }
 
       /* ── Toolbar buttons ── */
       var btns = document.createElement('div'); btns.className = 'tm-btns';
@@ -1139,6 +1186,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
         buildColDelRow();
         tbl.insertBefore(colDelRow, tbl.firstChild);
         rebuildRowIndices(); updateInfo();
+        redistributeColWidths();
       }]
       ].forEach(function (pair) {
         var b = document.createElement('button'); b.textContent = pair[0]; b.className = 'ph-btn'; b.style.fontSize = '12px';
