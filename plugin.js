@@ -683,6 +683,21 @@ a.phabricator-remarkup-embed-image img{background:white;}
     if ($.active) { if ($.remarkEl) applyLeft($.remarkEl); if ($.previewEl) applyRight($.previewEl); applyDivider(); positionMinimap(); }
   });
 
+  /* Measure the actual 'normal' line-height for a textarea's font.
+     Chrome returns 'normal' for textarea lineHeight; Firefox returns a px value.
+     We create a hidden single-line element with identical font metrics and measure it. */
+  function measureNormalLineHeight(ta, cs) {
+    var span = document.createElement('span');
+    span.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;' +
+      'font-family:' + cs.fontFamily + ';font-size:' + cs.fontSize +
+      ';font-weight:' + cs.fontWeight + ';letter-spacing:' + cs.letterSpacing + ';';
+    span.textContent = 'Xg';
+    ta.parentElement.appendChild(span);
+    var h = span.offsetHeight;
+    ta.parentElement.removeChild(span);
+    return h + 'px';
+  }
+
   function syncBackdropStyles(ta, el, bar) {
     var cs = getComputedStyle(ta);
     var bar_cs = bar ? getComputedStyle(bar) : null;
