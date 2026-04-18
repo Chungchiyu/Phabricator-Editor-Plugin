@@ -186,7 +186,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
     Object.assign(ta.style, {
       flex: '1', minHeight: '0', width: '100%', boxSizing: 'border-box',
       resize: 'none', border: 'none', outline: 'none', padding: '18px 20px', background: 'transparent',
-      position: 'relative', zIndex: '2', fontSize: '14px', lineHeight: '1.75', overflowY: 'auto', display: 'block'
+      position: 'relative', zIndex: '2', overflowY: 'auto', display: 'block'
     });
   }
   function applyRight(preview) {
@@ -668,18 +668,22 @@ a.phabricator-remarkup-embed-image img{background:white;}
 
   function syncBackdropStyles(ta, el) {
     var cs = getComputedStyle(ta);
+    var borderX =
+      (parseFloat(cs.borderLeftWidth) || 0) +
+      (parseFloat(cs.borderRightWidth) || 0);
+    var scrollbarGutter = Math.max(0, ta.offsetWidth - ta.clientWidth - borderX);
     el.style.fontFamily    = cs.fontFamily;
     el.style.fontSize      = cs.fontSize;
     el.style.fontWeight    = cs.fontWeight;
     var lh = cs.lineHeight;
     el.style.lineHeight    = (lh === 'normal')
-      ? (parseFloat(cs.fontSize) * 1.4) + 'px' // 1.4 is the browser default for 'normal'
+      ? measureNormalLineHeight(ta, cs)
       : lh;
     el.style.letterSpacing = cs.letterSpacing;
     el.style.wordSpacing   = cs.wordSpacing;
     el.style.textIndent    = cs.textIndent;
     el.style.paddingTop    = cs.paddingTop;
-    el.style.paddingRight  = cs.paddingRight;
+    el.style.paddingRight  = ((parseFloat(cs.paddingRight) || 0) + scrollbarGutter) + 'px';
     el.style.paddingBottom = cs.paddingBottom;
     el.style.paddingLeft   = cs.paddingLeft;
     el.style.borderTopWidth    = cs.borderTopWidth;
