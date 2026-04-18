@@ -49,7 +49,7 @@ javascript: (function () {
   transform:translate(-50%,-50%);width:3px;height:36px;border-radius:2px;background:rgba(255,255,255,.5);}
 .phe-bd{position:absolute!important;inset:0!important;box-sizing:border-box!important;
   white-space:pre-wrap!important;word-wrap:break-word!important;color:transparent!important;
-  pointer-events:none!important;font-size:14px!important;line-height:1.75!important;
+  pointer-events:none!important;
   z-index:1!important;overflow:hidden!important;}
 .phe-bd marker{color:transparent;}
 .phe-bd marker.bold{font-weight:bold;color:${TEXT};}
@@ -186,7 +186,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
     Object.assign(ta.style, {
       flex: '1', minHeight: '0', width: '100%', boxSizing: 'border-box',
       resize: 'none', border: 'none', outline: 'none', padding: '18px 20px', background: 'transparent',
-      position: 'relative', zIndex: '2', fontSize: '14px', lineHeight: '1.75', overflowY: 'auto', display: 'block'
+      position: 'relative', zIndex: '2', overflowY: 'auto', display: 'block'
     });
   }
   function applyRight(preview) {
@@ -666,6 +666,36 @@ a.phabricator-remarkup-embed-image img{background:white;}
     if ($.active) { if ($.remarkEl) applyLeft($.remarkEl); if ($.previewEl) applyRight($.previewEl); applyDivider(); positionMinimap(); }
   });
 
+  function syncBackdropStyles(ta, el, bar) {
+    var cs = getComputedStyle(ta);
+    var bar_cs = bar ? getComputedStyle(bar) : null;
+    var borderX =
+      (parseFloat(cs.borderLeftWidth) || 0) +
+      (parseFloat(cs.borderRightWidth) || 0);
+    var scrollbarGutter = Math.max(0, ta.offsetWidth - ta.clientWidth - borderX);
+    el.style.fontFamily    = cs.fontFamily;
+    el.style.fontSize      = cs.fontSize;
+    el.style.fontWeight    = cs.fontWeight;
+    var lh = cs.lineHeight;
+    el.style.lineHeight    = (lh === 'normal')
+      ? measureNormalLineHeight(ta, cs)
+      : lh;
+    el.style.letterSpacing = cs.letterSpacing;
+    el.style.wordSpacing   = cs.wordSpacing;
+    el.style.textIndent    = cs.textIndent;
+    el.style.paddingTop    = cs.paddingTop;
+    el.style.paddingRight  = ((parseFloat(cs.paddingRight) || 0) + scrollbarGutter) + 'px';
+    el.style.paddingBottom = cs.paddingBottom;
+    el.style.paddingLeft   = cs.paddingLeft;
+    el.style.borderTopWidth    = cs.borderTopWidth;
+    el.style.borderRightWidth  = cs.borderRightWidth;
+    el.style.borderBottomWidth = cs.borderBottomWidth;
+    el.style.borderLeftWidth   = cs.borderLeftWidth;
+
+    el.style.marginTop = bar_cs ? bar_cs.height : '0px';
+    try { el.style.tabSize = cs.tabSize; } catch (_) {}
+  }
+
   function hlText(text) {
     return text.replace(/\n$/g, '\n\n')
       .replace(/^#{1}(?!#).*$/gm, function (a) { return '<marker class="bold lb h1">' + a + '</marker>'; })
@@ -701,9 +731,9 @@ a.phabricator-remarkup-embed-image img{background:white;}
         if (ta.className.includes('PhabricatorMonospaced')) {
           $.backdrop = document.createElement('div');
           $.backdrop.className = 'phe-bd';
-          $.backdrop.style.padding = '18px 20px';
           $.backdrop.innerHTML = '<div id="_PHE_HL"></div>';
           ta.parentElement.insertBefore($.backdrop, ta);
+          syncBackdropStyles(ta, $.backdrop, bars[bars.length - 1]);
           ta.addEventListener('input', function () { var h = document.getElementById('_PHE_HL'); if (h) h.innerHTML = hlText(ta.value); });
           ta.dispatchEvent(new Event('input'));
           ta.addEventListener('scroll', function () { if ($.backdrop) $.backdrop.scrollTop = ta.scrollTop; });
