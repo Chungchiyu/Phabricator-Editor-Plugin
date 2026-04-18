@@ -5,7 +5,7 @@ javascript: (function () {
   var $ = {
     active: false, lpct: 50, drag: false, mergeBase: '',
     remarkEl: null, previewEl: null, isMulti: false, backdrop: null, syncer: null,
-    activeTA: null, savedScrollY: 0
+    activeTA: null, savedScrollY: 0, syntaxEnabled: true
   };
   var PAGE = window.location.href;
 
@@ -58,12 +58,28 @@ javascript: (function () {
 .phe-bd marker.h2::after{height:18px;background:${LIGHT ? '#CCD3CA' : '#9B86BD'};}
 .phe-bd marker.h3::after{height:10px;background:${LIGHT ? '#F5E8DD' : '#7776B3'};}
 .phe-bd marker.h4::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
+.phe-bd marker.h5::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
+.phe-bd marker.h6::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
 .phe-bd marker.dash::after{content:'';position:absolute;margin-top:.5em;margin-left:-1.5em;
   width:1em;height:.5em;border-radius:20%;background:${LIGHT ? '#B1AFFF' : '#50727B'};}
 .phe-bd marker.num{border-top-right-radius:50%;border-bottom-right-radius:50%;
   background:${LIGHT ? '#BBE9FF' : '#78A083'};}
 .phe-bd marker.rect{background:${LIGHT ? '#ecdff1' : '#622f78'};}
 .phe-bd marker.bord{background:transparent;box-shadow:${LIGHT ? '#1679AB' : '#B25068'} 0 0 1px 1px;}
+.phe-bd marker.italic{font-style:italic;color:${TEXT};}
+.phe-bd marker.mono{background:${LIGHT ? '#e8eaed' : '#2a3040'};border-radius:3px;}
+.phe-bd marker.strike{text-decoration:line-through;color:${TEXT};opacity:.6;}
+.phe-bd marker.uline{text-decoration:underline;color:${TEXT};}
+.phe-bd marker.quote{background:${LIGHT ? '#e3f2fd' : '#1a2a3a'};}
+.phe-bd marker.divider::after{height:2px;background:${LIGHT ? '#bbb' : '#555'};}
+.phe-bd marker.mention{color:${LIGHT ? '#1565c0' : '#5dade2'};background:${LIGHT ? '#a9a6a755' : '#e6e6e655'};border-radius:2px;}
+.phe-bd marker.hashtag{color:${LIGHT ? '#6a1b9a' : '#bb86fc'};}
+.phe-bd marker.objref{background:${LIGHT ? '#a9a6a755' : '#e6e6e655'};border-radius:2px;}
+.phe-bd marker.link{color:${LIGHT ? '#0277bd' : '#4fc3f7'};text-decoration:underline;text-underline-offset:2px;}
+.phe-bd marker.codefence{background:${LIGHT ? '#e8eaed' : '#2a3040'};}
+.phe-bd marker.callout-note{background:${LIGHT ? '#fff9c4' : '#3e3a20'};}
+.phe-bd marker.callout-warn{background:${LIGHT ? '#ffe0b2' : '#3e2e1a'};}
+.phe-bd marker.callout-imp{background:${LIGHT ? '#ffcdd2' : '#3e1a1a'};}
 a.phabricator-remarkup-embed-image img{background:white;}
 #_PHE_FB{position:fixed;bottom:0;left:0;z-index:999999;background:${BG};
   border:1px solid ${BORDER};border-radius:8px 8px 0 0;padding:8px 12px;gap:5px;
@@ -589,7 +605,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
       });
       /* Re-capture the preview element after Phabricator updates it */
       var newPv = $.remarkEl.closest('form') ?
-          $.remarkEl.closest('form').querySelector('.remarkup-inline-preview') : null;
+        $.remarkEl.closest('form').querySelector('.remarkup-inline-preview') : null;
       if (newPv) {
         if (newPv !== $.previewEl) {
           /* Preview element changed — clean up old one and rebind observer */
@@ -630,6 +646,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
     '<span class="logo">✏ Phab Editor</span>' +
     '<div class="sep"></div>' +
     '<button id="_PHE_EDIT" class="ph-btn">Edit Mode</button>' +
+    '<button id="_PHE_SYNTAX" class="ph-btn">Syntax Highlight</button>' +
     '<button id="_PHE_HALF" class="ph-btn">⇔ Half</button>' +
     '<button id="_PHE_FINDBTN" class="ph-btn">🔍 Find</button>' +
     '<div class="sep"></div>' +
@@ -666,6 +683,21 @@ a.phabricator-remarkup-embed-image img{background:white;}
     if ($.active) { if ($.remarkEl) applyLeft($.remarkEl); if ($.previewEl) applyRight($.previewEl); applyDivider(); positionMinimap(); }
   });
 
+  /* Measure the actual 'normal' line-height for a textarea's font.
+     Chrome returns 'normal' for textarea lineHeight; Firefox returns a px value.
+     We create a hidden single-line element with identical font metrics and measure it. */
+  function measureNormalLineHeight(ta, cs) {
+    var span = document.createElement('span');
+    span.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;' +
+      'font-family:' + cs.fontFamily + ';font-size:' + cs.fontSize +
+      ';font-weight:' + cs.fontWeight + ';letter-spacing:' + cs.letterSpacing + ';';
+    span.textContent = 'Xg';
+    ta.parentElement.appendChild(span);
+    var h = span.offsetHeight;
+    ta.parentElement.removeChild(span);
+    return h + 'px';
+  }
+
   function syncBackdropStyles(ta, el, bar) {
     var cs = getComputedStyle(ta);
     var bar_cs = bar ? getComputedStyle(bar) : null;
@@ -673,42 +705,99 @@ a.phabricator-remarkup-embed-image img{background:white;}
       (parseFloat(cs.borderLeftWidth) || 0) +
       (parseFloat(cs.borderRightWidth) || 0);
     var scrollbarGutter = Math.max(0, ta.offsetWidth - ta.clientWidth - borderX);
-    el.style.fontFamily    = cs.fontFamily;
-    el.style.fontSize      = cs.fontSize;
-    el.style.fontWeight    = cs.fontWeight;
+    el.style.fontFamily = cs.fontFamily;
+    el.style.fontSize = cs.fontSize;
+    el.style.fontWeight = cs.fontWeight;
     var lh = cs.lineHeight;
-    el.style.lineHeight    = (lh === 'normal')
+    el.style.lineHeight = (lh === 'normal')
       ? measureNormalLineHeight(ta, cs)
       : lh;
     el.style.letterSpacing = cs.letterSpacing;
-    el.style.wordSpacing   = cs.wordSpacing;
-    el.style.textIndent    = cs.textIndent;
-    el.style.paddingTop    = cs.paddingTop;
-    el.style.paddingRight  = ((parseFloat(cs.paddingRight) || 0) + scrollbarGutter) + 'px';
+    el.style.wordSpacing = cs.wordSpacing;
+    el.style.textIndent = cs.textIndent;
+    el.style.paddingTop = cs.paddingTop;
+    el.style.paddingRight = ((parseFloat(cs.paddingRight) || 0) + scrollbarGutter) + 'px';
     el.style.paddingBottom = cs.paddingBottom;
-    el.style.paddingLeft   = cs.paddingLeft;
-    el.style.borderTopWidth    = cs.borderTopWidth;
-    el.style.borderRightWidth  = cs.borderRightWidth;
+    el.style.paddingLeft = cs.paddingLeft;
+    el.style.borderTopWidth = cs.borderTopWidth;
+    el.style.borderRightWidth = cs.borderRightWidth;
     el.style.borderBottomWidth = cs.borderBottomWidth;
-    el.style.borderLeftWidth   = cs.borderLeftWidth;
+    el.style.borderLeftWidth = cs.borderLeftWidth;
 
     el.style.marginTop = bar_cs ? bar_cs.height : '0px';
-    try { el.style.tabSize = cs.tabSize; } catch (_) {}
+    try { el.style.tabSize = cs.tabSize; } catch (_) { }
   }
 
   function hlText(text) {
-    return text.replace(/\n$/g, '\n\n')
+    var escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return escaped.replace(/\n$/g, '\n\n')
+      /* Code fences ``` — highlight the fence lines themselves */
+      .replace(/^```.*$/gm, function (a) { return '<marker class="codefence">' + a + '</marker>'; })
+      /* Inline monospaced `code` */
+      .replace(/`[^`\n]+`/g, function (a) { return '<marker class="mono">' + a + '</marker>'; })
+      /* Headings # through ###### */
       .replace(/^#{1}(?!#).*$/gm, function (a) { return '<marker class="bold lb h1">' + a + '</marker>'; })
       .replace(/^#{2}(?!#).*$/gm, function (a) { return '<marker class="bold lb h2">' + a + '</marker>'; })
       .replace(/^#{3}(?!#).*$/gm, function (a) { return '<marker class="bold lb h3">' + a + '</marker>'; })
       .replace(/^#{4}(?!#).*$/gm, function (a) { return '<marker class="bold lb h4">' + a + '</marker>'; })
+      .replace(/^#{5}(?!#).*$/gm, function (a) { return '<marker class="bold lb h5">' + a + '</marker>'; })
+      .replace(/^#{6}(?!#).*$/gm, function (a) { return '<marker class="bold lb h6">' + a + '</marker>'; })
+      /* Headings = through ====== */
+      .replace(/^={1}(?!=).*$/gm, function (a) { return '<marker class="bold lb h1">' + a + '</marker>'; })
+      .replace(/^={2}(?!=).*$/gm, function (a) { return '<marker class="bold lb h2">' + a + '</marker>'; })
+      .replace(/^={3}(?!=).*$/gm, function (a) { return '<marker class="bold lb h3">' + a + '</marker>'; })
+      .replace(/^={4}(?!=).*$/gm, function (a) { return '<marker class="bold lb h4">' + a + '</marker>'; })
+      .replace(/^={5}(?!=).*$/gm, function (a) { return '<marker class="bold lb h5">' + a + '</marker>'; })
+      .replace(/^={6}(?!=).*$/gm, function (a) { return '<marker class="bold lb h6">' + a + '</marker>'; })
+      /* Bold **text** */
       .replace(/\*\*.*?\*\*/gm, function (a) { return '<marker class="bold">' + a + '</marker>'; })
+      /* Italic //text// — negative lookbehind avoids URLs like http:// */
+      .replace(/(^|[^\w:])(\/\/.*?\/\/)/gm, function (a, prefix, italic) { return prefix + '<marker class="italic">' + italic + '</marker>'; })
+      /* Strikethrough ~~text~~ */
+      .replace(/~~.*?~~/gm, function (a) { return '<marker class="strike">' + a + '</marker>'; })
+      /* Underline __text__ */
+      .replace(/__.*?__/gm, function (a) { return '<marker class="uline">' + a + '</marker>'; })
+      /* Highlight !!text!! */
+      .replace(/!!.*?!!/gm, function (a) { return '<marker class="rect">' + a + '</marker>'; })
+      /* Blockquote > lines */
+      .replace(/^>.*$/gm, function (a) { return '<marker class="quote">' + a + '</marker>'; })
+      /* Callouts NOTE: / WARNING: / IMPORTANT: */
+      .replace(/^(?:\(NOTE\)|NOTE:).*$/gm, function (a) { return '<marker class="callout-note">' + a + '</marker>'; })
+      .replace(/^(?:\(WARNING\)|WARNING:).*$/gm, function (a) { return '<marker class="callout-warn">' + a + '</marker>'; })
+      .replace(/^(?:\(IMPORTANT\)|IMPORTANT:).*$/gm, function (a) { return '<marker class="callout-imp">' + a + '</marker>'; })
+      /* Horizontal divider --- */
+      .replace(/^-{3,}\s*$/gm, function (a) { return '<marker class="lb divider">' + a + '</marker>'; })
+      /* @mentions */
+      .replace(/(^|\s)(@\w+)/gm, function (a, pre, mention) { return pre + '<marker class="mention">' + mention + '</marker>'; })
+      /* #project hashtags */
+      .replace(/(^|\s)(#[a-zA-Z_]\w*)/gm, function (a, pre, tag) { return pre + '<marker class="hashtag">' + tag + '</marker>'; })
+      /* Object references T123, D123 */
+      .replace(/(^|\W)([TD]\d+(#\d{6})?)/gm, function (a, pre, ref) { return pre + '<marker class="objref">' + ref + '</marker>'; })
+      /* Bullet lists - or + */
       .replace(/^(\s*[-+]\s)/gm, function (a) { return '<marker class="dash">' + a + '</marker>'; })
+      /* Numbered lists */
       .replace(/\W(\d+\.\s)/gm, function (a) { return '<marker class="num">' + a + '</marker>'; })
-      .replace(/\{.*?\}/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
-      .replace(/\[.*?\]/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
-      .replace(/!!.*!!/gm, function (a) { return '<marker class="rect">' + a + '</marker>'; });
+      /* Curly brace references {F123}, {icon ...}, {tex c_{mq}} — supports one level of nesting */
+      .replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
+      /* Markdown links [text](url) — matched before generic [...] */
+      .replace(/\[([^\[\]]*)\]\(([^)]*)\)/g, function (a, text, url) { return '<marker class="link">' + a + '</marker>'; })
+      /* Square bracket references [[wiki]] — supports one level of nesting */
+      .replace(/\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]/g, function (a) { return '<marker class="bord">' + a + '</marker>'; });
   }
+
+  document.getElementById('_PHE_SYNTAX').addEventListener('click', function () {
+    if (!$.active) return;
+    $.syntaxEnabled = !$.syntaxEnabled;
+    this.classList.toggle('on', $.syntaxEnabled);
+    if ($.backdrop) {
+      $.backdrop.style.display = $.syntaxEnabled ? '' : 'none';
+      var h = document.getElementById('_PHE_HL');
+      if (h) h.innerHTML = hlText($.activeTA.value);
+    }
+  });
 
   document.getElementById('_PHE_EDIT').addEventListener('click', function () {
     if (!$.active) {
@@ -728,16 +817,24 @@ a.phabricator-remarkup-embed-image img{background:white;}
         ta.focus();
         $.activeTA = ta;
         _pvLastText = ta.value;
-        if (ta.className.includes('PhabricatorMonospaced')) {
-          $.backdrop = document.createElement('div');
-          $.backdrop.className = 'phe-bd';
-          $.backdrop.innerHTML = '<div id="_PHE_HL"></div>';
-          ta.parentElement.insertBefore($.backdrop, ta);
-          syncBackdropStyles(ta, $.backdrop, bars[bars.length - 1]);
-          ta.addEventListener('input', function () { var h = document.getElementById('_PHE_HL'); if (h) h.innerHTML = hlText(ta.value); });
-          ta.dispatchEvent(new Event('input'));
-          ta.addEventListener('scroll', function () { if ($.backdrop) $.backdrop.scrollTop = ta.scrollTop; });
+        $._hadMono = ta.classList.contains('PhabricatorMonospaced');
+        if (!$._hadMono) {
+          ta.classList.add('PhabricatorMonospaced');
         }
+        $.backdrop = document.createElement('div');
+        $.backdrop.className = 'phe-bd';
+        $.backdrop.innerHTML = '<div id="_PHE_HL"></div>';
+        ta.parentElement.insertBefore($.backdrop, ta);
+        syncBackdropStyles(ta, $.backdrop, bars[bars.length - 1]);
+        ta.addEventListener('input', function () {
+          if (!$.syntaxEnabled) return;
+          var h = document.getElementById('_PHE_HL');
+          if (h) h.innerHTML = hlText(ta.value);
+        });
+        ta.dispatchEvent(new Event('input'));
+        ta.addEventListener('scroll', function () { if ($.backdrop) $.backdrop.scrollTop = ta.scrollTop; });
+        $.syntaxEnabled = true;
+        document.getElementById('_PHE_SYNTAX').classList.add('on');
         ta.addEventListener('input', schedulePreviewRefresh);
         ta.addEventListener('input', updateSaveBtn);
         $.syncer = new ScrollSyncer(ta);
@@ -757,11 +854,15 @@ a.phabricator-remarkup-embed-image img{background:white;}
         var bar = $.remarkEl.querySelector('.remarkup-assist-bar');
         if (bar) bar.removeAttribute('style');
         var ta = $.remarkEl.querySelector('textarea');
-        if (ta) { var node = ta.parentElement; while (node && node !== $.remarkEl) { node.removeAttribute('style'); node = node.parentElement; } ta.removeAttribute('style'); }
+        if (ta) {
+          if (!$._hadMono) ta.classList.remove('PhabricatorMonospaced');
+          var node = ta.parentElement; while (node && node !== $.remarkEl) { node.removeAttribute('style'); node = node.parentElement; } ta.removeAttribute('style');
+        }
       }
       if ($.previewEl) $.previewEl.removeAttribute('style');
       if ($.backdrop && $.backdrop.parentElement) $.backdrop.parentElement.removeChild($.backdrop);
       $.backdrop = null; DIV.style.display = 'none';
+      document.getElementById('_PHE_SYNTAX').classList.remove('on');
       if ($.isMulti) { setPreview(true); hideDialog(false); }
       else setPreview(false);
       $.active = false; $.remarkEl = null; $.previewEl = null;
@@ -900,7 +1001,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
   /* Auto-enter edit mode on any edit page,
      or when an inline comment editor dialog is open */
   if (/\/edit\//.test(PAGE) ||
-      document.querySelector('.jx-client-dialog .remarkup-assist-bar')) {
+    document.querySelector('.jx-client-dialog .remarkup-assist-bar')) {
     document.getElementById('_PHE_EDIT').click();
   }
 
