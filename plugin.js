@@ -58,12 +58,27 @@ javascript: (function () {
 .phe-bd marker.h2::after{height:18px;background:${LIGHT ? '#CCD3CA' : '#9B86BD'};}
 .phe-bd marker.h3::after{height:10px;background:${LIGHT ? '#F5E8DD' : '#7776B3'};}
 .phe-bd marker.h4::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
+.phe-bd marker.h5::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
+.phe-bd marker.h6::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
 .phe-bd marker.dash::after{content:'';position:absolute;margin-top:.5em;margin-left:-1.5em;
   width:1em;height:.5em;border-radius:20%;background:${LIGHT ? '#B1AFFF' : '#50727B'};}
 .phe-bd marker.num{border-top-right-radius:50%;border-bottom-right-radius:50%;
   background:${LIGHT ? '#BBE9FF' : '#78A083'};}
 .phe-bd marker.rect{background:${LIGHT ? '#ecdff1' : '#622f78'};}
 .phe-bd marker.bord{background:transparent;box-shadow:${LIGHT ? '#1679AB' : '#B25068'} 0 0 1px 1px;}
+.phe-bd marker.italic{font-style:italic;color:${TEXT};}
+.phe-bd marker.mono{background:${LIGHT ? '#e8eaed' : '#2a3040'};border-radius:3px;}
+.phe-bd marker.strike{text-decoration:line-through;color:${TEXT};opacity:.6;}
+.phe-bd marker.uline{text-decoration:underline;color:${TEXT};}
+.phe-bd marker.quote{background:${LIGHT ? '#e3f2fd' : '#1a2a3a'};}
+.phe-bd marker.divider::after{height:2px;background:${LIGHT ? '#bbb' : '#555'};}
+.phe-bd marker.mention{color:${LIGHT ? '#1565c0' : '#5dade2'};background:${LIGHT ? '#a9a6a755' : '#e6e6e655'};border-radius:2px;}
+.phe-bd marker.hashtag{color:${LIGHT ? '#6a1b9a' : '#bb86fc'};}
+.phe-bd marker.objref{background:${LIGHT ? '#a9a6a755' : '#e6e6e655'};border-radius:2px;}
+.phe-bd marker.codefence{background:${LIGHT ? '#e8eaed' : '#2a3040'};}
+.phe-bd marker.callout-note{background:${LIGHT ? '#fff9c4' : '#3e3a20'};}
+.phe-bd marker.callout-warn{background:${LIGHT ? '#ffe0b2' : '#3e2e1a'};}
+.phe-bd marker.callout-imp{background:${LIGHT ? '#ffcdd2' : '#3e1a1a'};}
 a.phabricator-remarkup-embed-image img{background:white;}
 #_PHE_FB{position:fixed;bottom:0;left:0;z-index:999999;background:${BG};
   border:1px solid ${BORDER};border-radius:8px 8px 0 0;padding:8px 12px;gap:5px;
@@ -699,16 +714,56 @@ a.phabricator-remarkup-embed-image img{background:white;}
 
   function hlText(text) {
     return text.replace(/\n$/g, '\n\n')
+      /* Code fences ``` — highlight the fence lines themselves */
+      .replace(/^```.*$/gm, function (a) { return '<marker class="codefence">' + a + '</marker>'; })
+      /* Inline monospaced `code` */
+      .replace(/`[^`\n]+`/g, function (a) { return '<marker class="mono">' + a + '</marker>'; })
+      /* Headings # through ###### */
       .replace(/^#{1}(?!#).*$/gm, function (a) { return '<marker class="bold lb h1">' + a + '</marker>'; })
       .replace(/^#{2}(?!#).*$/gm, function (a) { return '<marker class="bold lb h2">' + a + '</marker>'; })
       .replace(/^#{3}(?!#).*$/gm, function (a) { return '<marker class="bold lb h3">' + a + '</marker>'; })
       .replace(/^#{4}(?!#).*$/gm, function (a) { return '<marker class="bold lb h4">' + a + '</marker>'; })
+      .replace(/^#{5}(?!#).*$/gm, function (a) { return '<marker class="bold lb h5">' + a + '</marker>'; })
+      .replace(/^#{6}(?!#).*$/gm, function (a) { return '<marker class="bold lb h6">' + a + '</marker>'; })
+      /* Headings = through ====== */
+      .replace(/^={1}(?!=).*$/gm, function (a) { return '<marker class="bold lb h1">' + a + '</marker>'; })
+      .replace(/^={2}(?!=).*$/gm, function (a) { return '<marker class="bold lb h2">' + a + '</marker>'; })
+      .replace(/^={3}(?!=).*$/gm, function (a) { return '<marker class="bold lb h3">' + a + '</marker>'; })
+      .replace(/^={4}(?!=).*$/gm, function (a) { return '<marker class="bold lb h4">' + a + '</marker>'; })
+      .replace(/^={5}(?!=).*$/gm, function (a) { return '<marker class="bold lb h5">' + a + '</marker>'; })
+      .replace(/^={6}(?!=).*$/gm, function (a) { return '<marker class="bold lb h6">' + a + '</marker>'; })
+      /* Bold **text** */
       .replace(/\*\*.*?\*\*/gm, function (a) { return '<marker class="bold">' + a + '</marker>'; })
+      /* Italic //text// — negative lookbehind avoids URLs like http:// */
+      .replace(/(^|[^\w:])(\/\/.*?\/\/)/gm, function (a, prefix, italic) { return prefix + '<marker class="italic">' + italic + '</marker>'; })
+      /* Strikethrough ~~text~~ */
+      .replace(/~~.*?~~/gm, function (a) { return '<marker class="strike">' + a + '</marker>'; })
+      /* Underline __text__ */
+      .replace(/__.*?__/gm, function (a) { return '<marker class="uline">' + a + '</marker>'; })
+      /* Highlight !!text!! */
+      .replace(/!!.*?!!/gm, function (a) { return '<marker class="rect">' + a + '</marker>'; })
+      /* Blockquote > lines */
+      .replace(/^>.*$/gm, function (a) { return '<marker class="quote">' + a + '</marker>'; })
+      /* Callouts NOTE: / WARNING: / IMPORTANT: */
+      .replace(/^(?:\(NOTE\)|NOTE:).*$/gm, function (a) { return '<marker class="callout-note">' + a + '</marker>'; })
+      .replace(/^(?:\(WARNING\)|WARNING:).*$/gm, function (a) { return '<marker class="callout-warn">' + a + '</marker>'; })
+      .replace(/^(?:\(IMPORTANT\)|IMPORTANT:).*$/gm, function (a) { return '<marker class="callout-imp">' + a + '</marker>'; })
+      /* Horizontal divider --- */
+      .replace(/^-{3,}\s*$/gm, function (a) { return '<marker class="lb divider">' + a + '</marker>'; })
+      /* @mentions */
+      .replace(/(^|\s)(@\w+)/gm, function (a, pre, mention) { return pre + '<marker class="mention">' + mention + '</marker>'; })
+      /* #project hashtags */
+      .replace(/(^|\s)(#[a-zA-Z_]\w*)/gm, function (a, pre, tag) { return pre + '<marker class="hashtag">' + tag + '</marker>'; })
+      /* Object references T123, D123 */
+      .replace(/(^|\W)([TD]\d+(#\d{6})?)/gm, function (a, pre, ref) { return pre + '<marker class="objref">' + ref + '</marker>'; })
+      /* Bullet lists - or + */
       .replace(/^(\s*[-+]\s)/gm, function (a) { return '<marker class="dash">' + a + '</marker>'; })
+      /* Numbered lists */
       .replace(/\W(\d+\.\s)/gm, function (a) { return '<marker class="num">' + a + '</marker>'; })
+      /* Curly brace references {F123}, {icon ...}, etc. */
       .replace(/\{.*?\}/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
-      .replace(/\[.*?\]/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
-      .replace(/!!.*!!/gm, function (a) { return '<marker class="rect">' + a + '</marker>'; });
+      /* Square bracket links [[wiki]], [text](url) */
+      .replace(/\[.*?\]/g, function (a) { return '<marker class="bord">' + a + '</marker>'; });
   }
 
   document.getElementById('_PHE_SYNTAX').addEventListener('click', function () {
