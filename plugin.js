@@ -666,6 +666,29 @@ a.phabricator-remarkup-embed-image img{background:white;}
     if ($.active) { if ($.remarkEl) applyLeft($.remarkEl); if ($.previewEl) applyRight($.previewEl); applyDivider(); positionMinimap(); }
   });
 
+  function syncBackdropStyles(ta, el) {
+    var cs = getComputedStyle(ta);
+    el.style.fontFamily    = cs.fontFamily;
+    el.style.fontSize      = cs.fontSize;
+    el.style.fontWeight    = cs.fontWeight;
+    var lh = cs.lineHeight;
+    el.style.lineHeight    = (lh === 'normal')
+      ? (parseFloat(cs.fontSize) * 1.4) + 'px'
+      : lh;
+    el.style.letterSpacing = cs.letterSpacing;
+    el.style.wordSpacing   = cs.wordSpacing;
+    el.style.textIndent    = cs.textIndent;
+    el.style.paddingTop    = cs.paddingTop;
+    el.style.paddingRight  = cs.paddingRight;
+    el.style.paddingBottom = cs.paddingBottom;
+    el.style.paddingLeft   = cs.paddingLeft;
+    el.style.borderTopWidth    = cs.borderTopWidth;
+    el.style.borderRightWidth  = cs.borderRightWidth;
+    el.style.borderBottomWidth = cs.borderBottomWidth;
+    el.style.borderLeftWidth   = cs.borderLeftWidth;
+    try { el.style.tabSize = cs.tabSize; } catch (_) {}
+  }
+
   function hlText(text) {
     return text.replace(/\n$/g, '\n\n')
       .replace(/^#{1}(?!#).*$/gm, function (a) { return '<marker class="bold lb h1">' + a + '</marker>'; })
