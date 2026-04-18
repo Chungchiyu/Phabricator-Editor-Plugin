@@ -775,6 +775,8 @@ a.phabricator-remarkup-embed-image img{background:white;}
     this.classList.toggle('on', $.syntaxEnabled);
     if ($.backdrop) {
       $.backdrop.style.display = $.syntaxEnabled ? '' : 'none';
+      var h = document.getElementById('_PHE_HL');
+      if (h) h.innerHTML = hlText($.activeTA.value);
     }
   });
 
@@ -805,7 +807,11 @@ a.phabricator-remarkup-embed-image img{background:white;}
         $.backdrop.innerHTML = '<div id="_PHE_HL"></div>';
         ta.parentElement.insertBefore($.backdrop, ta);
         syncBackdropStyles(ta, $.backdrop, bars[bars.length - 1]);
-        ta.addEventListener('input', function () { var h = document.getElementById('_PHE_HL'); if (h) h.innerHTML = hlText(ta.value); });
+        ta.addEventListener('input', function () {
+          if (!$.syntaxEnabled) return;
+          var h = document.getElementById('_PHE_HL');
+          if (h) h.innerHTML = hlText(ta.value);
+        });
         ta.dispatchEvent(new Event('input'));
         ta.addEventListener('scroll', function () { if ($.backdrop) $.backdrop.scrollTop = ta.scrollTop; });
         $.syntaxEnabled = true;
