@@ -75,6 +75,7 @@ javascript: (function () {
 .phe-bd marker.mention{color:${LIGHT ? '#1565c0' : '#5dade2'};background:${LIGHT ? '#a9a6a755' : '#e6e6e655'};border-radius:2px;}
 .phe-bd marker.hashtag{color:${LIGHT ? '#6a1b9a' : '#bb86fc'};}
 .phe-bd marker.objref{background:${LIGHT ? '#a9a6a755' : '#e6e6e655'};border-radius:2px;}
+.phe-bd marker.link{color:${LIGHT ? '#0277bd' : '#4fc3f7'};text-decoration:underline;text-underline-offset:2px;}
 .phe-bd marker.codefence{background:${LIGHT ? '#e8eaed' : '#2a3040'};}
 .phe-bd marker.callout-note{background:${LIGHT ? '#fff9c4' : '#3e3a20'};}
 .phe-bd marker.callout-warn{background:${LIGHT ? '#ffe0b2' : '#3e2e1a'};}
@@ -762,7 +763,9 @@ a.phabricator-remarkup-embed-image img{background:white;}
       .replace(/\W(\d+\.\s)/gm, function (a) { return '<marker class="num">' + a + '</marker>'; })
       /* Curly brace references {F123}, {icon ...}, {tex c_{mq}} — supports one level of nesting */
       .replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
-      /* Square bracket links [[wiki]], [text](url) — supports one level of nesting */
+      /* Markdown links [text](url) — matched before generic [...] */
+      .replace(/\[([^\[\]]*)\]\(([^)]*)\)/g, function (a, text, url) { return '<marker class="link">' + a + '</marker>'; })
+      /* Square bracket references [[wiki]] — supports one level of nesting */
       .replace(/\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]/g, function (a) { return '<marker class="bord">' + a + '</marker>'; });
   }
 
