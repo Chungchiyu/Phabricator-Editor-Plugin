@@ -5,7 +5,7 @@ javascript: (function () {
   var $ = {
     active: false, lpct: 50, drag: false, mergeBase: '',
     remarkEl: null, previewEl: null, isMulti: false, backdrop: null, syncer: null,
-    activeTA: null, savedScrollY: 0
+    activeTA: null, savedScrollY: 0, syntaxEnabled: true
   };
   var PAGE = window.location.href;
 
@@ -630,6 +630,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
     '<span class="logo">✏ Phab Editor</span>' +
     '<div class="sep"></div>' +
     '<button id="_PHE_EDIT" class="ph-btn">Edit Mode</button>' +
+    '<button id="_PHE_SYNTAX" class="ph-btn">Syntax Highlight</button>' +
     '<button id="_PHE_HALF" class="ph-btn">⇔ Half</button>' +
     '<button id="_PHE_FINDBTN" class="ph-btn">🔍 Find</button>' +
     '<div class="sep"></div>' +
@@ -710,6 +711,15 @@ a.phabricator-remarkup-embed-image img{background:white;}
       .replace(/!!.*!!/gm, function (a) { return '<marker class="rect">' + a + '</marker>'; });
   }
 
+  document.getElementById('_PHE_SYNTAX').addEventListener('click', function () {
+    if (!$.active) return;
+    $.syntaxEnabled = !$.syntaxEnabled;
+    this.classList.toggle('on', $.syntaxEnabled);
+    if ($.backdrop) {
+      $.backdrop.style.display = $.syntaxEnabled ? '' : 'none';
+    }
+  });
+
   document.getElementById('_PHE_EDIT').addEventListener('click', function () {
     if (!$.active) {
       var bars = document.getElementsByClassName('remarkup-assist-bar');
@@ -728,16 +738,20 @@ a.phabricator-remarkup-embed-image img{background:white;}
         ta.focus();
         $.activeTA = ta;
         _pvLastText = ta.value;
-        if (ta.className.includes('PhabricatorMonospaced')) {
-          $.backdrop = document.createElement('div');
-          $.backdrop.className = 'phe-bd';
-          $.backdrop.innerHTML = '<div id="_PHE_HL"></div>';
-          ta.parentElement.insertBefore($.backdrop, ta);
-          syncBackdropStyles(ta, $.backdrop, bars[bars.length - 1]);
-          ta.addEventListener('input', function () { var h = document.getElementById('_PHE_HL'); if (h) h.innerHTML = hlText(ta.value); });
-          ta.dispatchEvent(new Event('input'));
-          ta.addEventListener('scroll', function () { if ($.backdrop) $.backdrop.scrollTop = ta.scrollTop; });
+        $._hadMono = ta.classList.contains('PhabricatorMonospaced');
+        if (!$._hadMono) {
+          ta.classList.add('PhabricatorMonospaced');
         }
+        $.backdrop = document.createElement('div');
+        $.backdrop.className = 'phe-bd';
+        $.backdrop.innerHTML = '<div id="_PHE_HL"></div>';
+        ta.parentElement.insertBefore($.backdrop, ta);
+        syncBackdropStyles(ta, $.backdrop, bars[bars.length - 1]);
+        ta.addEventListener('input', function () { var h = document.getElementById('_PHE_HL'); if (h) h.innerHTML = hlText(ta.value); });
+        ta.dispatchEvent(new Event('input'));
+        ta.addEventListener('scroll', function () { if ($.backdrop) $.backdrop.scrollTop = ta.scrollTop; });
+        $.syntaxEnabled = true;
+        document.getElementById('_PHE_SYNTAX').classList.add('on');
         ta.addEventListener('input', schedulePreviewRefresh);
         ta.addEventListener('input', updateSaveBtn);
         $.syncer = new ScrollSyncer(ta);
@@ -757,11 +771,15 @@ a.phabricator-remarkup-embed-image img{background:white;}
         var bar = $.remarkEl.querySelector('.remarkup-assist-bar');
         if (bar) bar.removeAttribute('style');
         var ta = $.remarkEl.querySelector('textarea');
-        if (ta) { var node = ta.parentElement; while (node && node !== $.remarkEl) { node.removeAttribute('style'); node = node.parentElement; } ta.removeAttribute('style'); }
+        if (ta) {
+          if (!$._hadMono) ta.classList.remove('PhabricatorMonospaced');
+          var node = ta.parentElement; while (node && node !== $.remarkEl) { node.removeAttribute('style'); node = node.parentElement; } ta.removeAttribute('style');
+        }
       }
       if ($.previewEl) $.previewEl.removeAttribute('style');
       if ($.backdrop && $.backdrop.parentElement) $.backdrop.parentElement.removeChild($.backdrop);
       $.backdrop = null; DIV.style.display = 'none';
+      document.getElementById('_PHE_SYNTAX').classList.remove('on');
       if ($.isMulti) { setPreview(true); hideDialog(false); }
       else setPreview(false);
       $.active = false; $.remarkEl = null; $.previewEl = null;
@@ -900,7 +918,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
   /* Auto-enter edit mode on any edit page,
      or when an inline comment editor dialog is open */
   if (/\/edit\//.test(PAGE) ||
-      document.querySelector('.jx-client-dialog .remarkup-assist-bar')) {
+    document.querySelector('.jx-client-dialog .remarkup-assist-bar')) {
     document.getElementById('_PHE_EDIT').click();
   }
 
