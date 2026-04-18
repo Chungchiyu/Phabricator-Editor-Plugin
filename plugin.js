@@ -49,7 +49,7 @@ javascript: (function () {
   transform:translate(-50%,-50%);width:3px;height:36px;border-radius:2px;background:rgba(255,255,255,.5);}
 .phe-bd{position:absolute!important;inset:0!important;box-sizing:border-box!important;
   white-space:pre-wrap!important;word-wrap:break-word!important;color:transparent!important;
-  pointer-events:none!important;font-size:14px!important;line-height:1.75!important;
+  pointer-events:none!important;
   z-index:1!important;overflow:hidden!important;}
 .phe-bd marker{color:transparent;}
 .phe-bd marker.bold{font-weight:bold;color:${TEXT};}
