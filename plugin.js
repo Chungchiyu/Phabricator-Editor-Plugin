@@ -673,7 +673,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
     el.style.fontWeight    = cs.fontWeight;
     var lh = cs.lineHeight;
     el.style.lineHeight    = (lh === 'normal')
-      ? (parseFloat(cs.fontSize) * 1.4) + 'px'
+      ? (parseFloat(cs.fontSize) * 1.4) + 'px' // 1.4 is the browser default for 'normal'
       : lh;
     el.style.letterSpacing = cs.letterSpacing;
     el.style.wordSpacing   = cs.wordSpacing;
