@@ -1198,12 +1198,19 @@ a.phabricator-remarkup-embed-image img{background:white;}
       });
       tMd.appendChild(btns);
 
+      function serializeCellValue(ta) {
+        return ta.value
+          .replace(/\{newline\}[ \t]*\n[ \t]*/g, '{newline} ')
+          .replace(/\n/g, '{newline} ')
+          .trim();
+      }
+
       /* ── Save handler ── */
       saveBtn.addEventListener('click', function () {
         var rows = Array.from(tbl.rows).filter(function (tr) { return tr !== colDelRow; });
         var lines = rows.map(function (tr) {
           return Array.from(tr.cells).filter(function (td) { return !td.classList.contains('tm-del-row'); })
-            .map(function (td) { return td.firstChild.value.trim(); });
+            .map(function (td) { return serializeCellValue(td.firstChild); });
         }).map(function (r) { return '| ' + r.join(' | ') + ' |'; });
         /* Insert header separator after first row if header is active */
         if (hasHeader && lines.length > 0) {
@@ -1212,6 +1219,10 @@ a.phabricator-remarkup-embed-image img{background:white;}
           lines.splice(1, 0, sep);
         }
         replaceWith(lines.join('\n'));
+        if (oTA) {
+          oTA.dispatchEvent(new Event('input', { bubbles: true }));
+          oTA.dispatchEvent(new Event('change', { bubbles: true }));
+        }
         tMd.style.display = 'none';
       });
 
