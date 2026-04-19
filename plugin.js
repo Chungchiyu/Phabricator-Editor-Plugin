@@ -1028,6 +1028,11 @@ a.phabricator-remarkup-embed-image img{background:white;}
         });
       }
 
+      function ensureColDelRowAttached() {
+        var firstRow = tbl.rows[0];
+        if (firstRow !== colDelRow) tbl.insertBefore(colDelRow, firstRow || null);
+      }
+
       /* ── Column delete buttons row ── */
       var colDelRow = document.createElement('tr');
       function buildColDelRow() {
@@ -1088,8 +1093,8 @@ a.phabricator-remarkup-embed-image img{background:white;}
         tbl.appendChild(tr);
       });
 
+      ensureColDelRowAttached();
       buildColDelRow();
-      tbl.insertBefore(colDelRow, tbl.firstChild);
       tMd.appendChild(tbl);
 
       /* ── Auto-size after DOM insertion: widths first, then heights ── */
@@ -1184,7 +1189,6 @@ a.phabricator-remarkup-embed-image img{background:white;}
           tr.appendChild(mkCell('', ri, ci));
         });
         buildColDelRow();
-        tbl.insertBefore(colDelRow, tbl.firstChild);
         rebuildRowIndices(); updateInfo();
         redistributeColWidths();
       }]
