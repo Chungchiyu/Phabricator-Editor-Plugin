@@ -1235,8 +1235,8 @@ a.phabricator-remarkup-embed-image img{background:white;}
     var html = e.clipboardData.getData('text/html'); if (!html) return;
     var doc2 = new DOMParser().parseFromString(html, 'text/html');
     var tbl = doc2.querySelector('table'); if (!tbl) return;
-    var arr = Array.from(tbl.rows).map(function (row) { return Array.from(row.cells).map(function (c) { return (c.textContent || '').trim(); }); });
-    var md = arr.map(function (row) { return '\n| ' + row.map(function (c) { return c.replace(/\n/g, ''); }).join(' | ') + ' |'; }).join('');
+    var arr = Array.from(tbl.rows).map(function (row) { return Array.from(row.cells).map(function (c) { c.querySelectorAll('br').forEach((br) => br.replaceWith('\n')); return (c.textContent || '').trim(); }); });
+    var md = arr.map(function (row) { return '\n| ' + row.map(function (c) { return c.replace(/\n/g, '{newline}'); }).join(' | ') + ' |'; }).join('');
     var ta = document.activeElement, s = ta.selectionStart, end = ta.selectionEnd;
     ta.setRangeText(md, s, end, 'select'); e.preventDefault();
   });
