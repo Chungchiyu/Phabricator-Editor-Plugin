@@ -630,6 +630,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
         b.style.pointerEvents = '';
         b.style.opacity = '';
       });
+      ensureHighlightAssistButton($.remarkEl, ta);
       /* Re-capture the preview element after Phabricator updates it */
       var newPv = $.remarkEl.closest('form') ?
         $.remarkEl.closest('form').querySelector('.remarkup-inline-preview') : null;
