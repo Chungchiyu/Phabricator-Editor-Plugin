@@ -5,14 +5,23 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 ## Security
 - No additional packages required.
 - Only injects CSS and JavaScript into the current page; removed on page refresh.
-- No data is collected or sent to any server.
+- No data is collected or sent to any third-party server. The only outgoing request beyond normal page/save traffic is a same-origin call to Phabricator's own `/api/user.whoami` conduit endpoint, used by Auto-Join to identify the current viewer.
 
 ## Usage
 - **!! Important !!** Currently supports `Task Maniphest`, `Events`, `Comment Editor`, and `New Comment` only.
 - **!! Important !!** For `New Comment`, you must type some text in the editor to show the preview panel before using full-screen editing mode.
 
 ## Version
-- Current version: `v2.2`
+- Current version: `v2.3.1`
+
+## v2.3.1 Changes
+- **Auto-Join**: Save on a Task/Event edit form now automatically adds you to Subscribers/Invitees if you're not already on it.
+- **Locate**: selecting text in the preview highlights and scrolls to the matching source in the editor (toggle with "⇄ Locate").
+- **Auto Update toggle**: optionally disable live preview re-rendering and refresh manually instead.
+- **Minimap hierarchy hover**: hovering a top-level minimap item reveals its sub-headings for direct navigation; edit-mode headings are now read from the editor's `=` syntax in document order.
+- Minimap now stays in sync after "Show Older Changes" loads more comments or a Calendar event's AJAX preview refresh replaces the preview pane.
+- Clicking the toolbar logo navigates to the Phabricator homepage.
+- Smoother syntax-highlight backdrop scrolling via a compositor-thread animation.
 
 ## v2.2 Changes
 - AutoMerge now preserves Event invitees/attendees fields on submit.
@@ -100,7 +109,7 @@ Use `install-phab-editor.bat` for automatic installation on Windows.
     - Firefox
     - All
 4. Wait until installation completes, then re-open browser if needed.
-5. Open Phabricator and click the installed bookmark `✏Phab Editor v2.2`.
+5. Open Phabricator and click the installed bookmark `✏Phab Editor v2.3.1`.
 
 Notes:
 - The installer may close and re-open your browser to update bookmarks safely.

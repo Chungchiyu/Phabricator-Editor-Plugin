@@ -1,6 +1,6 @@
 javascript: (function () {
   'use strict';
-  var PLUGIN_VERSION = 'v2.2';
+  var PLUGIN_VERSION = 'v2.3.1';
   if (document.getElementById('_PHE_TB')) { alert('Already active!'); return; }
 
   var $ = {
