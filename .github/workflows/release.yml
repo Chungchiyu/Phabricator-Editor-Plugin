@@ -1,0 +1,56 @@
+# Builds the bookmarklet/installer and publishes them as a GitHub Release
+# draft whenever a "v*" tag is pushed. The release is created as a draft so
+# release notes can be reviewed/edited before publishing.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.10"
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: "24"
+
+    - name: Verify tag matches PLUGIN_VERSION
+      run: |
+        VERSION=$(grep -oP "PLUGIN_VERSION = '\K[^']+" plugin.js)
+        if [ "$VERSION" != "${GITHUB_REF_NAME}" ]; then
+          echo "Tag ${GITHUB_REF_NAME} does not match PLUGIN_VERSION '$VERSION' in plugin.js" >&2
+          exit 1
+        fi
+
+    - name: Generate bookmarklet and installer
+      run: python convert.py
+
+    - name: Prepare versioned installer copy
+      run: cp install-phab-editor.bat "install-phab-editor-${GITHUB_REF_NAME}.bat"
+
+    - name: Create draft release and upload assets
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release create "${GITHUB_REF_NAME}" \
+          --title "${GITHUB_REF_NAME}" \
+          --draft \
+          --generate-notes \
+          plugin-inline.js \
+          install-phab-editor.bat \
+          "install-phab-editor-${GITHUB_REF_NAME}.bat"

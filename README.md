@@ -5,14 +5,23 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 ## Security
 - No additional packages required.
 - Only injects CSS and JavaScript into the current page; removed on page refresh.
-- No data is collected or sent to any server.
+- No data is collected or sent to any third-party server. The only outgoing request beyond normal page/save traffic is a same-origin call to Phabricator's own `/api/user.whoami` conduit endpoint, used by Auto-Join to identify the current viewer.
 
 ## Usage
 - **!! Important !!** Currently supports `Task Maniphest`, `Events`, `Comment Editor`, and `New Comment` only.
 - **!! Important !!** For `New Comment`, you must type some text in the editor to show the preview panel before using full-screen editing mode.
 
 ## Version
-- Current version: `v2.2`
+- Current version: `v2.3.1`
+
+## v2.3.1 Changes
+- **Auto-Join**: Save on a Task/Event edit form now automatically adds you to Subscribers/Invitees if you're not already on it.
+- **Locate**: selecting text in the preview highlights and scrolls to the matching source in the editor (toggle with "⇄ Locate").
+- **Auto Update toggle**: optionally disable live preview re-rendering and refresh manually instead.
+- **Minimap hierarchy hover**: hovering a top-level minimap item reveals its sub-headings for direct navigation; edit-mode headings are now read from the editor's `=` syntax in document order.
+- Minimap now stays in sync after "Show Older Changes" loads more comments or a Calendar event's AJAX preview refresh replaces the preview pane.
+- Clicking the toolbar logo navigates to the Phabricator homepage.
+- Smoother syntax-highlight backdrop scrolling via a compositor-thread animation.
 
 ## v2.2 Changes
 - AutoMerge now preserves Event invitees/attendees fields on submit.
@@ -26,6 +35,7 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 
 ### Toolbar
 - A fixed top toolbar with Logo, Edit Mode, Half/Full toggle, Find, Save, and Cancel buttons.
+- Click the logo to navigate to the Phabricator homepage.
 - **Save button** is automatically disabled when no changes have been made; enabled once content is modified.
 - The page **does not auto-enter edit mode** on load; you must click Edit Mode manually.
 - Pressing Back from comment edit mode restores the preview page and scroll position.
@@ -34,6 +44,8 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 - Full-screen / half-screen mode toggle
 - **Adjustable split pane** — drag the divider between editor and preview to resize (15%–85%)
 - **Scroll sync** — editor and preview scroll positions are synchronized
+- **Locate** — selecting text in the rendered preview highlights and scrolls to the matching source text in the editor (toggle with the "⇄ Locate" button); supports LaTeX blocks
+- **Auto Update toggle** — switch off live preview re-rendering on every keystroke and refresh manually with the floating "↻ Update" button instead (useful for long documents)
 - **Syntax highlight backdrop** — headings, bold, lists, brackets, and other Remarkup syntax are highlighted with color blocks in the editor
 - Hotkeys:
     - `Ctrl-B`: Bold
@@ -64,11 +76,16 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
     - Batch resolve with All Current, All Incoming, or All Both
     - Review the selected resolution before saving
 
+### Auto-Join
+- On the Task / Event **edit form** page, clicking Save automatically adds you to the Subscribers (Task) / Invitees (Event) field if you aren't already on it.
+- No-op if you're already subscribed/invited; never blocks Save if it can't determine this (e.g. older Phabricator/Phorge versions with a different tokenizer implementation).
+- Does not apply to comment editing or new comments — only the dedicated Task/Event edit form.
+
 ### Minimap / Table of Contents
 - A vertical **minimap** is displayed on the right side of the screen.
 - **Page mode** (non-edit mode): shows headings (h1–h6) from the description and comments with actual content from the timeline.
-- **Edit mode**: shows all headings (h1–h6) from the preview pane.
-- Hover over a minimap item to see a **tooltip** (first line of content, truncated at 20 characters with "…").
+- **Edit mode**: shows all headings (h1–h6), read from the editor's `=` syntax in document order (falls back to the rendered preview for anything not matched).
+- Hover over a minimap item to see a **tooltip** (first line of content, truncated at 20 characters with "…") and, if it has sub-headings, a **hierarchy panel** listing them — click any sub-heading to jump straight to it.
 - Click a minimap item to **smooth-scroll** to the corresponding position.
 - The **current scroll position** highlights the corresponding minimap item.
 - Right-click any minimap item to **toggle a red mark**, useful for flagging important sections.
@@ -82,9 +99,9 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 
 ## Install (Windows One-Click)
 
-Use [`install-phab-editor.bat`](https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases/download/v2.2/install-phab-editor-v2.2.bat) for automatic installation on Windows.
+Use `install-phab-editor.bat` for automatic installation on Windows. It is **not** part of the repo checkout — each release builds it fresh with the current version's bookmarklet baked in, so always grab it from the Releases page rather than an old copy on disk.
 
-1. Download this repository (or at least [`install-phab-editor.bat`](https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases/download/v2.2/install-phab-editor-v2.2.bat)).
+1. Download [`install-phab-editor.bat` (always the latest release)](https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases/latest/download/install-phab-editor.bat). To get a specific older version instead, open the [Releases page](https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases) and download that release's versioned asset (e.g. `install-phab-editor-v2.3.1.bat`).
 2. Double-click `install-phab-editor.bat`.
 3. Choose target browser:
     - Chrome
@@ -92,7 +109,7 @@ Use [`install-phab-editor.bat`](https://github.com/Chungchiyu/Phabricator-Editor
     - Firefox
     - All
 4. Wait until installation completes, then re-open browser if needed.
-5. Open Phabricator and click the installed bookmark `✏Phab Editor v2.2`.
+5. Open Phabricator and click the installed bookmark `✏Phab Editor v2.3.1`.
 
 Notes:
 - The installer may close and re-open your browser to update bookmarks safely.
@@ -109,16 +126,30 @@ Notes:
 | File | Description |
 |------|-------------|
 | `plugin.js` | Source code (readable) |
-| `plugin-inline.js` | Minified bookmarklet (auto-generated by CI, not committed) |
-| `install-phab-editor.bat` | Windows one-click installer for Chrome/Edge/Firefox bookmarks |
-| `convert.py` | Build script: minifies `plugin.js` with [terser](https://terser.org/) and wraps as bookmarklet |
+| `plugin-inline.js` | Minified bookmarklet (auto-generated, not committed) |
+| `install-phab-editor.template.bat` | Tracked template for the installer (placeholder bookmarklet/name) |
+| `install-phab-editor.bat` | Windows one-click installer with the real bookmarklet baked in (auto-generated, not committed — only published as a release asset) |
+| `convert.py` | Build script: minifies `plugin.js` with [terser](https://terser.org/), wraps it as a bookmarklet, and renders `install-phab-editor.bat` from the template |
 | `assets/` | Static assets (screenshots, etc.) |
 
 ## Development
 1. Ensure **Python 3** and **Node.js** are installed.
 2. Edit `plugin.js`.
-3. Run the conversion script to generate the bookmarklet:
+3. Run the conversion script to generate the bookmarklet and installer:
     ```bash
     python3 convert.py
     ```
-4. Paste the content of `plugin-inline.js` into a bookmark URL field to test.
+4. Paste the content of `plugin-inline.js` into a bookmark URL field to test, or double-click the freshly generated `install-phab-editor.bat`.
+
+## Cutting a Release
+A push of a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds `plugin-inline.js` and `install-phab-editor.bat` and creates a **draft** GitHub Release with both files attached (the installer under both its versioned name and the unversioned `install-phab-editor.bat`, so the `releases/latest/download/install-phab-editor.bat` link always resolves to the newest version).
+
+1. Bump `PLUGIN_VERSION` in `plugin.js` (on `main`).
+2. Tag it and push the tag, e.g.:
+    ```bash
+    git tag v2.3.1
+    git push origin v2.3.1
+    ```
+3. Wait for the workflow to finish, then open the **draft** release on the [Releases page](https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases), add release notes, and publish it.
+
+The workflow fails fast if the tag doesn't match `PLUGIN_VERSION` in `plugin.js`, to catch a forgotten version bump.
