@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 PLUGIN_FILE = Path('plugin.js')
 BOOKMARKLET_FILE = Path('plugin-inline.js')
+BAT_TEMPLATE = Path('install-phab-editor.template.bat')
 BAT_FILE = Path('install-phab-editor.bat')
 BAT_NAME_PREFIX = '✏Phab Editor'
 
@@ -52,8 +53,14 @@ def extract_version(js_code):
     return match.group(1)
 
 
-def update_bat_bookmarklet(bat_path, bookmarklet, version):
-    content = bat_path.read_text(encoding='utf-8')
+def update_bat_bookmarklet(template_path, output_path, bookmarklet, version):
+    """Render the installer batch file from its template.
+
+    Reads the tracked template (placeholder bookmarklet/name) and writes the
+    real, version-specific installer to output_path, which is a generated
+    build artifact and not committed to git.
+    """
+    content = template_path.read_text(encoding='utf-8')
 
     start_marker = 'rem :::URL_START:::'
     end_marker = 'rem :::URL_END:::'
@@ -87,7 +94,7 @@ def update_bat_bookmarklet(bat_path, bookmarklet, version):
         msg = 'Could not find BM_NAME line in install-bookmarklet.bat'
         raise RuntimeError(msg)
 
-    bat_path.write_text('\n'.join(updated_lines) + '\n', encoding='utf-8')
+    output_path.write_text('\n'.join(updated_lines) + '\n', encoding='utf-8')
 
 
 def main():
@@ -105,8 +112,8 @@ def main():
     # Write the output
     BOOKMARKLET_FILE.write_text(bookmarklet, encoding='utf-8')
 
-    # Update batch installer bookmarklet and BM_NAME.
-    update_bat_bookmarklet(BAT_FILE, bookmarklet, version)
+    # Render the batch installer from its template.
+    update_bat_bookmarklet(BAT_TEMPLATE, BAT_FILE, bookmarklet, version)
 
     original_size = len(content)
     minified_size = len(bookmarklet)
