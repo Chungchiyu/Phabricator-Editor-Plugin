@@ -130,6 +130,8 @@ Notes:
 | `install-phab-editor.template.bat` | Tracked template for the installer (placeholder bookmarklet/name) |
 | `install-phab-editor.bat` | Windows one-click installer with the real bookmarklet baked in (auto-generated, not committed — only published as a release asset) |
 | `convert.py` | Build script: minifies `plugin.js` with [terser](https://terser.org/), wraps it as a bookmarklet, and renders `install-phab-editor.bat` from the template |
+| `CHANGELOG.md` | Chinese, user-facing changelog; one `## v<version>` section per release |
+| `release_notes.py` | Builds a GitHub Release body from `CHANGELOG.md` + install instructions |
 | `assets/` | Static assets (screenshots, etc.) |
 
 ## Development
@@ -142,14 +144,15 @@ Notes:
 4. Paste the content of `plugin-inline.js` into a bookmark URL field to test, or double-click the freshly generated `install-phab-editor.bat`.
 
 ## Cutting a Release
-A push of a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds `plugin-inline.js` and `install-phab-editor.bat` and creates a **draft** GitHub Release with both files attached (the installer under both its versioned name and the unversioned `install-phab-editor.bat`, so the `releases/latest/download/install-phab-editor.bat` link always resolves to the newest version).
+A push of a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds `plugin-inline.js` and `install-phab-editor.bat` and creates a **draft** GitHub Release with both files attached (the installer under both its versioned name and the unversioned `install-phab-editor.bat`, so the `releases/latest/download/install-phab-editor.bat` link always resolves to the newest version). The release body is auto-filled from [`CHANGELOG.md`](CHANGELOG.md) plus installation steps — see [`release_notes.py`](release_notes.py).
 
 1. Bump `PLUGIN_VERSION` in `plugin.js` (on `main`).
-2. Tag it and push the tag, e.g.:
+2. Add a matching `## v<version>` entry to [`CHANGELOG.md`](CHANGELOG.md) (same version string as `PLUGIN_VERSION`).
+3. Tag it and push the tag, e.g.:
     ```bash
     git tag v2.3.1
     git push origin v2.3.1
     ```
-3. Wait for the workflow to finish, then open the **draft** release on the [Releases page](https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases), add release notes, and publish it.
+4. Wait for the workflow to finish, then open the **draft** release on the [Releases page](https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases), double-check the auto-filled notes, and publish it.
 
-The workflow fails fast if the tag doesn't match `PLUGIN_VERSION` in `plugin.js`, to catch a forgotten version bump.
+The workflow fails fast if the tag doesn't match `PLUGIN_VERSION` in `plugin.js`, to catch a forgotten version bump. If `CHANGELOG.md` has no matching entry, the release notes will say so instead of failing silently.
