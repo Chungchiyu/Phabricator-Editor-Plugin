@@ -529,18 +529,9 @@ a.phabricator-remarkup-embed-image img{background:white;}
   }
   var _mergeBusy = false;
 
-  function actionPath(action) {
-    try {
-      return new URL(action || '', location.href).pathname;
-    } catch (_) {
-      return action || '';
-    }
-  }
-
-  function isEventEditForm(form) {
-    if (!form) return false;
-    return /\/calendar\/event\/edit\//.test(actionPath(form.getAttribute('action') || ''));
-  }
+  function actionPath(a) { try { return new URL(a || '', location.href).pathname; } catch (_) { return a || ''; } }
+  function isEventEditForm(f) { return !!f && /\/calendar\/event\/edit\//.test(actionPath(f.getAttribute('action') || '')); }
+  function isTaskEditForm(f) { return !!f && /\/maniphest\/task\/edit\//.test(actionPath(f.getAttribute('action') || '')); }
 
   function findRemoteForm(localForm, remoteDoc) {
     if (!remoteDoc) return null;
@@ -585,13 +576,100 @@ a.phabricator-remarkup-embed-image img{background:white;}
     });
   }
 
-  function submitMergedForm(form, remoteDoc, mergedText) {
+  async function submitMergedForm(form, remoteDoc, mergedText) {
     syncRemoteInvitees(form, remoteDoc);
+    /* Must run after syncRemoteInvitees: that step wholesale-replaces the
+       local Invitees fields with the remote (pre-save) fetch's fields,
+       which would otherwise wipe out a just-added auto-join token. */
+    await autoJoinIfNeeded(form);
     if (typeof mergedText === 'string') {
       getTA().value = mergedText;
       $.mergeBase = mergedText;
     }
     form.submit();
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     AUTO-JOIN
+     On the Task/Event edit form, make sure the current viewer is
+     present in the Subscribers (task) / Invitees (event) tokenizer
+     before the form is submitted. Both fields are backed by a
+     Javelin JX.Tokenizer widget on a PhabricatorMetaMTAMailableDatasource;
+     we fetch the viewer's own PHID via the conduit user.whoami API and
+     call the live widget's own addToken(), which already no-ops if the
+     viewer is present, so this is safe to attempt on every save.
+     ════════════════════════════════════════════════════════════ */
+  function getTokenizerWidget(container) {
+    try {
+      if (!container || typeof JX === 'undefined' || !JX.Stratcom) return null;
+      /* The .jx-tokenizer node Tokenizer.js renders is an inner div; the
+         JX.Stratcom data (incl. the live tokenizer instance) is attached to
+         its outer wrapper, so walk up a few ancestors to find it. */
+      for (var node = container, hops = 0; node && hops < 4; node = node.parentElement, hops++) {
+        var data = JX.Stratcom.getData(node);
+        if (data && data.tokenizer) return data.tokenizer;
+      }
+    } catch (_e) { /* best effort */ }
+    return null;
+  }
+
+  function findMailableTokenizer(form, nameHint) {
+    var nodes = form.querySelectorAll('.jx-tokenizer');
+    for (var i = 0; i < nodes.length; i++) {
+      var tokenizer = getTokenizerWidget(nodes[i]);
+      if (!tokenizer || !tokenizer._typeahead || !tokenizer._typeahead.getDatasource) continue;
+      try {
+        var ds = tokenizer._typeahead.getDatasource();
+        var uri = ds && ds.uri;
+        if (!uri || uri.indexOf('PhabricatorMetaMTAMailableDatasource') === -1) continue;
+        /* A page can have both a generic Subscribers field and an
+           object-specific one (e.g. Calendar's Invitees) on the same
+           PhabricatorMetaMTAMailableDatasource; disambiguate by the
+           original control's field name (e.g. "inviteePHIDs" vs
+           "subscriberPHIDs"), which is stable regardless of UI locale. */
+        var fieldName = (tokenizer._orig && tokenizer._orig.name) || '';
+        if (nameHint.test(fieldName)) return tokenizer;
+      } catch (_e) { /* try the next node */ }
+    }
+    return null;
+  }
+
+  function fetchWithTimeout(url, opts, timeoutMs) {
+    return Promise.race([
+      fetch(url, opts),
+      new Promise(function (_resolve, reject) { setTimeout(function () { reject(new Error('timeout')); }, timeoutMs); })
+    ]);
+  }
+
+  async function getViewerIdentity() {
+    try {
+      var csrf = document.querySelector('input[name="__csrf__"]');
+      if (!csrf || !csrf.value) return null;
+      var resp = await fetchWithTimeout('/api/user.whoami', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: '__csrf__=' + encodeURIComponent(csrf.value)
+      }, 5000);
+      var json = await resp.json();
+      if (!json || json.error_code || !json.result || !json.result.phid) return null;
+      return { phid: json.result.phid, name: json.result.realName || json.result.userName };
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  async function autoJoinIfNeeded(form) {
+    var isEvent = isEventEditForm(form);
+    if (!form || (!isTaskEditForm(form) && !isEvent)) return;
+    try {
+      var nameHint = isEvent ? /invite/i : /subscri/i;
+      var tokenizer = findMailableTokenizer(form, nameHint);
+      if (!tokenizer) return;
+      var viewer = await getViewerIdentity();
+      if (!viewer) return;
+      tokenizer.addToken(viewer.phid, viewer.name);
+    } catch (_e) { /* never block save on auto-join failure */ }
   }
 
   async function doAutoMerge() {
