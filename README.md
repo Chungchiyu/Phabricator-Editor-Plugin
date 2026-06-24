@@ -70,8 +70,8 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 ### Minimap / Table of Contents
 - A vertical **minimap** is displayed on the right side of the screen.
 - **Page mode** (non-edit mode): shows headings (h1–h6) from the description and comments with actual content from the timeline.
-- **Edit mode**: shows all headings (h1–h6) from the preview pane.
-- Hover over a minimap item to see a **tooltip** (first line of content, truncated at 20 characters with "…").
+- **Edit mode**: shows all headings (h1–h6), read from the editor's `=` syntax in document order (falls back to the rendered preview for anything not matched).
+- Hover over a minimap item to see a **tooltip** (first line of content, truncated at 20 characters with "…") and, if it has sub-headings, a **hierarchy panel** listing them — click any sub-heading to jump straight to it.
 - Click a minimap item to **smooth-scroll** to the corresponding position.
 - The **current scroll position** highlights the corresponding minimap item.
 - Right-click any minimap item to **toggle a red mark**, useful for flagging important sections.
