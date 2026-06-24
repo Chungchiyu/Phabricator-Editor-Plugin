@@ -142,6 +142,14 @@ Notes:
 4. Paste the content of `plugin-inline.js` into a bookmark URL field to test, or double-click the freshly generated `install-phab-editor.bat`.
 
 ## Cutting a Release
-1. Bump `PLUGIN_VERSION` in `plugin.js` and run `python3 convert.py`.
-2. Create a GitHub Release tagged with that version.
-3. Attach `install-phab-editor.bat` **twice**: once renamed to include the version (e.g. `install-phab-editor-v2.3.1.bat`) for that release's own listing, and once with the unversioned filename `install-phab-editor.bat` so the `releases/latest/download/install-phab-editor.bat` link in this README always resolves to the newest version.
+A push of a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds `plugin-inline.js` and `install-phab-editor.bat` and creates a **draft** GitHub Release with both files attached (the installer under both its versioned name and the unversioned `install-phab-editor.bat`, so the `releases/latest/download/install-phab-editor.bat` link always resolves to the newest version).
+
+1. Bump `PLUGIN_VERSION` in `plugin.js` (on `main`).
+2. Tag it and push the tag, e.g.:
+    ```bash
+    git tag v2.3.1
+    git push origin v2.3.1
+    ```
+3. Wait for the workflow to finish, then open the **draft** release on the [Releases page](https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases), add release notes, and publish it.
+
+The workflow fails fast if the tag doesn't match `PLUGIN_VERSION` in `plugin.js`, to catch a forgotten version bump.
