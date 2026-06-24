@@ -29,7 +29,7 @@ javascript: (function () {
   display:flex;align-items:center;padding:0 12px;gap:6px;z-index:999999;
   font:13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   box-shadow:0 2px 10px rgba(0,0,0,.4);}
-#_PHE_TB .logo{font-size:14px;font-weight:700;color:#5dade2;margin-right:4px;white-space:nowrap;}
+#_PHE_TB .logo{font-size:14px;font-weight:700;color:#5dade2;margin-right:4px;white-space:nowrap;cursor:pointer;}
 #_PHE_TB .sep{width:1px;height:22px;background:rgba(255,255,255,.13);margin:0 2px;flex-shrink:0;}
 #_PHE_TB .sp{flex:1;}
 .ph-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11);
@@ -671,6 +671,9 @@ a.phabricator-remarkup-embed-image img{background:white;}
     '<button id="_PHE_CANCEL" class="ph-btn cancel">✕ Cancel</button>' +
     '<button id="_PHE_SAVE" class="ph-btn save">💾 Save</button>';
   document.body.appendChild(TB_EL);
+  TB_EL.querySelector('.logo').addEventListener('click', function () {
+    window.location.href = window.location.origin + '/';
+  });
 
   var SAVE_BTN = document.getElementById('_PHE_SAVE');
   SAVE_BTN.setAttribute('disabled', '');
