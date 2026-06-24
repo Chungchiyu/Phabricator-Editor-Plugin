@@ -161,7 +161,25 @@ a.phabricator-remarkup-embed-image img{background:white;}
   padding:3px 9px;font-size:11.5px;color:${MMTIPCOL};
   white-space:nowrap;opacity:0;transition:opacity .15s;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}`;
+}
+#_PHE_MM_HIER{
+  position:fixed;z-index:9999998;pointer-events:auto;
+  background:${LIGHT ? 'rgba(232,234,242,.97)' : 'rgba(18,23,42,.97)'};border:1px solid ${LIGHT ? 'rgba(0,0,0,.13)' : 'rgba(255,255,255,.16)'};border-radius:6px;
+  padding:4px 0;font-size:11.5px;color:${MMTIPCOL};
+  max-width:220px;max-height:260px;overflow-y:auto;
+  opacity:0;transform:translateY(-50%) translateX(calc(100% + 70px));
+  transition:transform .38s cubic-bezier(.25,.46,.45,.94),opacity .28s;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+#_PHE_MM_HIER::-webkit-scrollbar{width:4px;}
+#_PHE_MM_HIER::-webkit-scrollbar-track{background:transparent;}
+#_PHE_MM_HIER::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:2px;}
+#_PHE_MM_HIER::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.45);}
+.mm-hier-item{padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.6;}
+.mm-hier-item.lv-root{font-weight:600;}
+.mm-hier-item.clickable{cursor:pointer;}
+.mm-hier-item.clickable:hover{background:${LIGHT ? 'rgba(0,0,0,.09)' : 'rgba(255,255,255,.16)'};border-radius:3px;box-shadow:inset 2px 0 0 #3498db;}
+`;
     document.head.appendChild(s);
   })();
 
@@ -288,7 +306,17 @@ a.phabricator-remarkup-embed-image img{background:white;}
      ════════════════════════════════════════════════════════════ */
   var MM = document.createElement('div'); MM.id = '_PHE_MM';
   var MM_TIP = document.createElement('div'); MM_TIP.id = '_PHE_MM_TIP';
+  var MM_HIER = document.createElement('div'); MM_HIER.id = '_PHE_MM_HIER';
   document.body.appendChild(MM_TIP);
+  document.body.appendChild(MM_HIER);
+  MM_HIER.addEventListener('mouseenter', function () { _hierOpen(); });
+  MM_HIER.addEventListener('mouseleave', function () { _hierSchedHide(); });
+  MM_HIER.addEventListener('wheel', function (e) {
+    var atTop = MM_HIER.scrollTop === 0;
+    var atBottom = MM_HIER.scrollTop + MM_HIER.clientHeight >= MM_HIER.scrollHeight - 1;
+    if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) e.preventDefault();
+    e.stopPropagation();
+  }, { passive: false });
 
   (function () {
     var ns = 'http://www.w3.org/2000/svg';
@@ -305,8 +333,10 @@ a.phabricator-remarkup-embed-image img{background:white;}
     MM.appendChild(MM._up); MM.appendChild(MM._lines); MM.appendChild(MM._dn);
     document.body.appendChild(MM);
   })();
+  MM.addEventListener('mouseleave', function () { _hierSchedHide(); });
 
   var _mmItems = [], _mmHeadings = [], _mmRebuildTimer = null, _mmMO = null;
+  var _hierTimer = null, _hierItem = null, _hierState = 'hidden';
 
   /* ── Position: fixed right=12px, vertically centered ── */
   function positionMinimap() {
@@ -317,6 +347,112 @@ a.phabricator-remarkup-embed-image img{background:white;}
 
   /* Truncate to N chars with ellipsis */
   function truncTip(s, n) { s = (s || '').trim(); return s.length > n ? s.substring(0, n) + '…' : s; }
+
+  function _hierHide() {
+    clearTimeout(_hierTimer);
+    if (_hierState === 'hidden') return;
+    _hierState = 'hidden';
+    var R = parseFloat(MM_HIER.style.right) || 100;
+    var W = MM_HIER.offsetWidth || 220;
+    MM_HIER.style.transform = 'translateY(-50%) translateX(' + (R + W) + 'px)';
+    MM_HIER.style.opacity = '0';
+    _hierItem = null;
+  }
+
+  function _hierOpen() {
+    clearTimeout(_hierTimer);
+    if (_hierState === 'hidden' || !_hierItem) return;
+    _hierState = 'open';
+    MM_HIER.style.transform = 'translateY(-50%) translateX(0)';
+  }
+
+  function _hierSchedHide() {
+    clearTimeout(_hierTimer);
+    _hierTimer = setTimeout(_hierHide, 400);
+  }
+
+  function _hierBuildContent(item) {
+    var headings = [];
+    var eqRe = /^(={1,6})\s*(.*?)\s*=*\s*$/;
+    var inEditMode = $.active && !!$.previewEl;
+
+    if (item._pheRemarkupEl) {
+      Array.from(item._pheRemarkupEl.querySelectorAll('h1,h2,h3,h4,h5,h6')).forEach(function (h) {
+        headings.push({ level: parseInt(h.tagName.charAt(1)), label: (h.textContent || '').split('\n')[0].trim(), el: h });
+      });
+    } else if (item._pheHierEl && item._pheHierEl.tagName && /^H[1-6]$/.test(item._pheHierEl.tagName)) {
+      var hEl = item._pheHierEl;
+      var level = parseInt(hEl.tagName.charAt(1));
+      var parent = hEl.parentElement;
+      if (parent) {
+        var allH = Array.from(parent.querySelectorAll('h1,h2,h3,h4,h5,h6'));
+        var idx = allH.indexOf(hEl);
+        for (var i = idx + 1; i < allH.length; i++) {
+          var sl = parseInt(allH[i].tagName.charAt(1));
+          if (sl <= level) break;
+          headings.push({ level: sl, label: (allH[i].textContent || '').split('\n')[0].trim(), el: allH[i] });
+        }
+      }
+    } else if (item._pheTaLineIdx !== undefined && $.active && $.activeTA) {
+      var lines = $.activeTA.value.split('\n');
+      var level = item._pheLevel;
+      for (var i = item._pheTaLineIdx + 1; i < lines.length; i++) {
+        var m = eqRe.exec(lines[i]);
+        if (!m) continue;
+        var sl = m[1].length;
+        if (sl <= level) break;
+        var slabel = m[2].trim();
+        if (slabel) headings.push({ level: sl, label: slabel, el: null });
+      }
+    }
+
+    if (!headings.length) return false;
+
+    var minL = Math.min.apply(null, headings.map(function (h) { return h.level; }));
+    MM_HIER.innerHTML = '';
+    headings.forEach(function (h) {
+      var indent = (h.level - minL) * 12;
+      var div = document.createElement('div');
+      div.className = 'mm-hier-item' + (h.level === minL ? ' lv-root' : '') + (h.el ? ' clickable' : '');
+      div.style.paddingLeft = (8 + indent) + 'px';
+      div.textContent = h.label || '';
+      if (h.el) {
+        div.addEventListener('click', (function (el) { return function (e) {
+          e.stopPropagation();
+          if (inEditMode && $.previewEl) {
+            $.previewEl.scrollTo({ top: Math.max(0, el.offsetTop - 20), behavior: 'smooth' });
+          } else {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }; })(h.el));
+      }
+      MM_HIER.appendChild(div);
+    });
+    return true;
+  }
+
+  function _hierPeek(item) {
+    clearTimeout(_hierTimer);
+    /* If same item and panel already visible, just cancel the pending hide timer */
+    if (_hierItem === item && _hierState !== 'hidden') return;
+    if (_hierItem !== item) {
+      if (!_hierBuildContent(item)) return;
+      _hierItem = item;
+    }
+    _hierState = 'peek';
+    var mmRect = MM.getBoundingClientRect();
+    var r = item.getBoundingClientRect();
+    var R = window.innerWidth - mmRect.left + 8;
+    MM_HIER.style.right = R + 'px';
+    MM_HIER.style.top = (r.top + r.height / 2) + 'px';
+    /* Show ~14px sliver instantly (no transition) so cursor can reach it */
+    var W = MM_HIER.offsetWidth || 220;
+    MM_HIER.style.transition = 'none';
+    MM_HIER.style.opacity = '1';
+    MM_HIER.style.transform = 'translateY(-50%) translateX(' + (R + W - 8) + 'px)';
+    void MM_HIER.offsetWidth;
+    MM_HIER.style.transition = '';
+  }
 
   /* Shared minimap item builder: attaches hover tooltip + right-click mark toggle */
   function mkMmItem(cls, label, scrollFn) {
@@ -329,8 +465,11 @@ a.phabricator-remarkup-embed-image img{background:white;}
       MM_TIP.style.right = (window.innerWidth - r.left + 8) + 'px';
       MM_TIP.style.transform = 'translateY(-50%)';
       MM_TIP.style.opacity = '1';
+      _hierPeek(item);
     });
-    item.addEventListener('mouseleave', function () { MM_TIP.style.opacity = '0'; });
+    item.addEventListener('mouseleave', function () {
+      MM_TIP.style.opacity = '0';
+    });
     item.addEventListener('click', scrollFn);
     item.addEventListener('contextmenu', function (e) {
       e.preventDefault();
@@ -342,15 +481,61 @@ a.phabricator-remarkup-embed-image img{background:white;}
   function rebuildMinimap() {
     MM._lines.innerHTML = ''; _mmItems = []; _mmHeadings = [];
     if ($.active && $.previewEl) {
-      /* Edit mode: headings from preview pane */
-      var hs = Array.from($.previewEl.querySelectorAll('h1,h2,h3,h4,h5,h6'));
-      hs.forEach(function (h) {
-        var label = (h.textContent || '').split('\n')[0];
+      /* Edit mode: headings from textarea == syntax (preserves order) + preview DOM fallback */
+      var seenLabels = Object.create(null);
+      var eqRe = /^(={1,6})\s*(.*?)\s*=*\s*$/;
+      if ($.activeTA) {
+        var taLines = $.activeTA.value.split('\n');
+        var totalTaLines = taLines.length;
+        taLines.forEach(function (line, li) {
+          var m = eqRe.exec(line);
+          if (!m) return;
+          var level = m[1].length;
+          var label = m[2].trim();
+          if (!label || seenLabels[label]) return;
+          seenLabels[label] = true;
+          var lineFrac = li / Math.max(1, totalTaLines - 1);
+          /* Try to find matching rendered heading for accurate scroll */
+          var previewH = null;
+          var hCands = Array.from($.previewEl.querySelectorAll('h' + level));
+          for (var ci = 0; ci < hCands.length; ci++) {
+            if ((hCands[ci].textContent || '').split('\n')[0].trim() === label) {
+              previewH = hCands[ci]; break;
+            }
+          }
+          var item, trackEl;
+          if (previewH) {
+            item = mkMmItem('h' + level, label, (function (h) { return function () {
+              $.previewEl.scrollTo({ top: Math.max(0, h.offsetTop - 20), behavior: 'smooth' });
+            }; })(previewH));
+            trackEl = previewH;
+            item._pheHierEl = previewH;
+          } else {
+            item = mkMmItem('h' + level, label, (function (frac) { return function () {
+              var ms = $.previewEl.scrollHeight - $.previewEl.clientHeight;
+              $.previewEl.scrollTo({ top: Math.max(0, frac * ms), behavior: 'smooth' });
+            }; })(lineFrac));
+            trackEl = (function (frac) {
+              return { get offsetTop() { return Math.round(frac * ($.previewEl ? $.previewEl.scrollHeight : 0)); } };
+            })(lineFrac);
+            item._pheHierEl = null;
+            item._pheLevel = level;
+            item._pheTaLineIdx = li;
+          }
+          MM._lines.appendChild(item);
+          _mmItems.push(item); _mmHeadings.push(trackEl);
+        });
+      }
+      /* Add any preview headings not already matched by textarea scan */
+      Array.from($.previewEl.querySelectorAll('h1,h2,h3,h4,h5,h6')).forEach(function (h) {
+        var label = (h.textContent || '').split('\n')[0].trim();
+        if (seenLabels[label]) return;
+        seenLabels[label] = true;
         var item = mkMmItem(h.tagName.toLowerCase(), label, function () {
           $.previewEl.scrollTo({ top: Math.max(0, h.offsetTop - 20), behavior: 'smooth' });
         });
-        MM._lines.appendChild(item);
-        _mmItems.push(item); _mmHeadings.push(h);
+        item._pheHierEl = h;
+        MM._lines.appendChild(item); _mmItems.push(item); _mmHeadings.push(h);
       });
     } else {
       /* Page mode: headings from description + comments from timeline */
@@ -362,6 +547,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
           var item = mkMmItem(h.tagName.toLowerCase(), label, function () {
             h.scrollIntoView({ behavior: 'smooth', block: 'start' });
           });
+          item._pheHierEl = h;
           MM._lines.appendChild(item);
           _mmItems.push(item); _mmHeadings.push(h);
         });
@@ -376,6 +562,8 @@ a.phabricator-remarkup-embed-image img{background:white;}
         var item = mkMmItem('comment', firstLine, function () {
           block.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
+        item._pheHierEl = block;
+        item._pheRemarkupEl = remarkup;
         MM._lines.appendChild(item);
         _mmItems.push(item); _mmHeadings.push(block);
       });
