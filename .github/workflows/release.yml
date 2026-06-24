@@ -1,6 +1,8 @@
 # Builds the bookmarklet/installer and publishes them as a GitHub Release
-# draft whenever a "v*" tag is pushed. The release is created as a draft so
-# release notes can be reviewed/edited before publishing.
+# draft whenever a "v*" tag is pushed. Release notes are rendered from the
+# matching CHANGELOG.md entry plus install instructions (see
+# release_notes.py). The release is created as a draft so it can be
+# reviewed/edited before publishing.
 
 name: Release
 
@@ -43,6 +45,9 @@ jobs:
     - name: Prepare versioned installer copy
       run: cp install-phab-editor.bat "install-phab-editor-${GITHUB_REF_NAME}.bat"
 
+    - name: Build release notes (changelog + install instructions)
+      run: python release_notes.py "${GITHUB_REF_NAME}" > release_notes.md
+
     - name: Create draft release and upload assets
       env:
         GH_TOKEN: ${{ github.token }}
@@ -50,7 +55,7 @@ jobs:
         gh release create "${GITHUB_REF_NAME}" \
           --title "${GITHUB_REF_NAME}" \
           --draft \
-          --generate-notes \
+          --notes-file release_notes.md \
           plugin-inline.js \
           install-phab-editor.bat \
           "install-phab-editor-${GITHUB_REF_NAME}.bat"
