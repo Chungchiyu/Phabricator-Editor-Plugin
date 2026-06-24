@@ -26,6 +26,7 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 
 ### Toolbar
 - A fixed top toolbar with Logo, Edit Mode, Half/Full toggle, Find, Save, and Cancel buttons.
+- Click the logo to navigate to the Phabricator homepage.
 - **Save button** is automatically disabled when no changes have been made; enabled once content is modified.
 - The page **does not auto-enter edit mode** on load; you must click Edit Mode manually.
 - Pressing Back from comment edit mode restores the preview page and scroll position.
