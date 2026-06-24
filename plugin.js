@@ -65,9 +65,7 @@ javascript: (function () {
 .phe-bd marker.h1::after{height:26px;background:${LIGHT ? '#B5C0D0' : '#E2BBE9'};}
 .phe-bd marker.h2::after{height:18px;background:${LIGHT ? '#CCD3CA' : '#9B86BD'};}
 .phe-bd marker.h3::after{height:10px;background:${LIGHT ? '#F5E8DD' : '#7776B3'};}
-.phe-bd marker.h4::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
-.phe-bd marker.h5::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
-.phe-bd marker.h6::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
+.phe-bd marker.h4::after,.phe-bd marker.h5::after,.phe-bd marker.h6::after{height:10px;background:${LIGHT ? '#EED3D9' : '#5A639C'};}
 .phe-bd marker.dash::after{content:'';position:absolute;margin-top:.5em;margin-left:-1.5em;
   width:1em;height:.5em;border-radius:20%;background:${LIGHT ? '#B1AFFF' : '#50727B'};}
 .phe-bd marker.num{border-top-right-radius:50%;border-bottom-right-radius:50%;
@@ -1112,12 +1110,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
   var _pvRefreshToken = 0;
   var _pvWaitObserver = null;
 
-  function stopPreviewWait() {
-    if (_pvWaitObserver) {
-      _pvWaitObserver.disconnect();
-      _pvWaitObserver = null;
-    }
-  }
+  function stopPreviewWait() { if (_pvWaitObserver) { _pvWaitObserver.disconnect(); _pvWaitObserver = null; } }
 
   function waitPreviewUpdated(form, token, onReady) {
     stopPreviewWait();
@@ -1425,15 +1418,10 @@ a.phabricator-remarkup-embed-image img{background:white;}
      Chrome returns 'normal' for textarea lineHeight; Firefox returns a px value.
      We create a hidden single-line element with identical font metrics and measure it. */
   function measureNormalLineHeight(ta, cs) {
-    var span = document.createElement('span');
-    span.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;' +
-      'font-family:' + cs.fontFamily + ';font-size:' + cs.fontSize +
-      ';font-weight:' + cs.fontWeight + ';letter-spacing:' + cs.letterSpacing + ';';
-    span.textContent = 'Xg';
-    ta.parentElement.appendChild(span);
-    var h = span.offsetHeight;
-    ta.parentElement.removeChild(span);
-    return h + 'px';
+    var s = document.createElement('span');
+    s.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-family:' + cs.fontFamily + ';font-size:' + cs.fontSize + ';font-weight:' + cs.fontWeight + ';letter-spacing:' + cs.letterSpacing + ';';
+    s.textContent = 'Xg'; ta.parentElement.appendChild(s);
+    var h = s.offsetHeight; ta.parentElement.removeChild(s); return h + 'px';
   }
 
   function syncBackdropStyles(ta, el, bar) {
@@ -1471,29 +1459,21 @@ a.phabricator-remarkup-embed-image img{background:white;}
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    return escaped.replace(/\n$/g, '\n\n')
-      /* Code fences ``` — highlight the fence lines themselves */
+    var out = escaped.replace(/\n$/g, '\n\n')
       .replace(/^```.*$/gm, function (a) { return '<marker class="codefence">' + a + '</marker>'; })
-      /* Inline monospaced `code` */
-      .replace(/`[^`\n]+`/g, function (a) { return '<marker class="mono">' + a + '</marker>'; })
-      /* Headings # through ###### */
-      .replace(/^#{1}(?!#).*$/gm, function (a) { return '<marker class="bold lb h1">' + a + '</marker>'; })
-      .replace(/^#{2}(?!#).*$/gm, function (a) { return '<marker class="bold lb h2">' + a + '</marker>'; })
-      .replace(/^#{3}(?!#).*$/gm, function (a) { return '<marker class="bold lb h3">' + a + '</marker>'; })
-      .replace(/^#{4}(?!#).*$/gm, function (a) { return '<marker class="bold lb h4">' + a + '</marker>'; })
-      .replace(/^#{5}(?!#).*$/gm, function (a) { return '<marker class="bold lb h5">' + a + '</marker>'; })
-      .replace(/^#{6}(?!#).*$/gm, function (a) { return '<marker class="bold lb h6">' + a + '</marker>'; })
-      /* Headings = through ====== */
-      .replace(/^={1}(?!=).*$/gm, function (a) { return '<marker class="bold lb h1">' + a + '</marker>'; })
-      .replace(/^={2}(?!=).*$/gm, function (a) { return '<marker class="bold lb h2">' + a + '</marker>'; })
-      .replace(/^={3}(?!=).*$/gm, function (a) { return '<marker class="bold lb h3">' + a + '</marker>'; })
-      .replace(/^={4}(?!=).*$/gm, function (a) { return '<marker class="bold lb h4">' + a + '</marker>'; })
-      .replace(/^={5}(?!=).*$/gm, function (a) { return '<marker class="bold lb h5">' + a + '</marker>'; })
-      .replace(/^={6}(?!=).*$/gm, function (a) { return '<marker class="bold lb h6">' + a + '</marker>'; })
+      .replace(/`[^`\n]+`/g, function (a) { return '<marker class="mono">' + a + '</marker>'; });
+    for (var _n = 1; _n <= 6; _n++) {
+      (function (n) {
+        out = out
+          .replace(new RegExp('^#{' + n + '}(?!#).*$', 'gm'), function (a) { return '<marker class="bold lb h' + n + '">' + a + '</marker>'; })
+          .replace(new RegExp('^={' + n + '}(?!=).*$', 'gm'), function (a) { return '<marker class="bold lb h' + n + '">' + a + '</marker>'; });
+      })(_n);
+    }
+    return out
       /* Bold **text** */
       .replace(/\*\*.*?\*\*/gm, function (a) { return '<marker class="bold">' + a + '</marker>'; })
       /* Italic //text// — negative lookbehind avoids URLs like http:// */
-      .replace(/(^|[^\w:])(\/\/.*?\/\/)/gm, function (a, prefix, italic) { return prefix + '<marker class="italic">' + italic + '</marker>'; })
+      .replace(/(^|[^\w:])(\/\/.*?\/\/)/gm, function (a, p, it) { return p + '<marker class="italic">' + it + '</marker>'; })
       /* Strikethrough ~~text~~ */
       .replace(/~~.*?~~/gm, function (a) { return '<marker class="strike">' + a + '</marker>'; })
       /* Underline __text__ */
@@ -1509,19 +1489,19 @@ a.phabricator-remarkup-embed-image img{background:white;}
       /* Horizontal divider --- */
       .replace(/^-{3,}\s*$/gm, function (a) { return '<marker class="lb divider">' + a + '</marker>'; })
       /* @mentions */
-      .replace(/(^|\s)(@\w+)/gm, function (a, pre, mention) { return pre + '<marker class="mention">' + mention + '</marker>'; })
+      .replace(/(^|\s)(@\w+)/gm, function (a, p, m) { return p + '<marker class="mention">' + m + '</marker>'; })
       /* #project hashtags */
-      .replace(/(^|\s)(#[a-zA-Z_]\w*)/gm, function (a, pre, tag) { return pre + '<marker class="hashtag">' + tag + '</marker>'; })
+      .replace(/(^|\s)(#[a-zA-Z_]\w*)/gm, function (a, p, t) { return p + '<marker class="hashtag">' + t + '</marker>'; })
       /* Object references T123, D123 */
-      .replace(/(^|\W)([TD]\d+(#\d{6})?)/gm, function (a, pre, ref) { return pre + '<marker class="objref">' + ref + '</marker>'; })
+      .replace(/(^|\W)([TD]\d+(#\d{6})?)/gm, function (a, p, r) { return p + '<marker class="objref">' + r + '</marker>'; })
       /* Bullet lists - or + */
       .replace(/^(\s*[-+]\s)/gm, function (a) { return '<marker class="dash">' + a + '</marker>'; })
       /* Numbered lists */
       .replace(/\W(\d+\.\s)/gm, function (a) { return '<marker class="num">' + a + '</marker>'; })
-      /* Curly brace references {F123}, {icon ...}, {tex c_{mq}} — supports one level of nesting */
+      /* Curly brace references {F123}, {icon ...} — supports one level of nesting */
       .replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, function (a) { return '<marker class="bord">' + a + '</marker>'; })
       /* Markdown links [text](url) — matched before generic [...] */
-      .replace(/\[([^\[\]]*)\]\(([^)]*)\)/g, function (a, text, url) { return '<marker class="link">' + a + '</marker>'; })
+      .replace(/\[([^\[\]]*)\]\(([^)]*)\)/g, function (a) { return '<marker class="link">' + a + '</marker>'; })
       /* Square bracket references [[wiki]] — supports one level of nesting */
       .replace(/\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]/g, function (a) { return '<marker class="bord">' + a + '</marker>'; });
   }
@@ -1616,8 +1596,6 @@ a.phabricator-remarkup-embed-image img{background:white;}
     _hlFloatBtn.style.top = top + 'px';
     _hlFloatBtn.style.display = 'inline-flex';
 
-    /* Table button and highlight button are both shown on mouseup timers.
-       Re-check after paint to avoid race-condition overlap. */
     adjustHighlightAwayFromTableBtn();
     requestAnimationFrame(adjustHighlightAwayFromTableBtn);
     setTimeout(adjustHighlightAwayFromTableBtn, 20);
@@ -1690,8 +1668,6 @@ a.phabricator-remarkup-embed-image img{background:white;}
       if (targetTa) {
         if (targetTa !== ta && !draggedFromSameTA) { _hlDragStartTA = null; hideHighlightFloatButton(); return; }
       } else {
-        /* Allow non-textarea targets inside table editor (td/tr wrappers),
-           and allow mouseup outside when drag started from the same textarea. */
         if (!(taInTable && clickInTable) && !draggedFromSameTA) { _hlDragStartTA = null; hideHighlightFloatButton(); return; }
       }
 
@@ -1922,7 +1898,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
     else if (e.ctrlKey && e.key === 'i') { ins(ta, '//'); ta.setSelectionRange(ta.selectionEnd - 2, ta.selectionEnd - 2); e.preventDefault(); }
     else if (e.ctrlKey && e.key === 's') { e.preventDefault(); document.getElementById('_PHE_SAVE').click(); }
     else if (e.key === '`' || e.key === '"' || e.key === "'") { ins(ta, e.key); ta.setSelectionRange(ta.selectionEnd - 1, ta.selectionEnd - 1); e.preventDefault(); }
-    else if (e.key === '(') { insT(ta, '(', ')');; ta.setSelectionRange(ta.selectionEnd - 1, ta.selectionEnd - 1); e.preventDefault(); }
+    else if (e.key === '(') { insT(ta, '(', ')'); ta.setSelectionRange(ta.selectionEnd - 1, ta.selectionEnd - 1); e.preventDefault(); }
     else if (e.key === '[') { insT(ta, '[', ']'); ta.setSelectionRange(ta.selectionEnd - 1, ta.selectionEnd - 1); e.preventDefault(); }
     else if (e.key === '{') { insT(ta, '{', '}'); ta.setSelectionRange(ta.selectionEnd - 1, ta.selectionEnd - 1); e.preventDefault(); }
     else if (e.key === 'Tab') {
@@ -1948,8 +1924,9 @@ a.phabricator-remarkup-embed-image img{background:white;}
     var tMd = document.createElement('div'); tMd.id = '_PHE_TBLMOD';
     document.body.appendChild(tBtn); document.body.appendChild(tMd);
     function isTable(t) { var ls = t.trim().split('\n'); return ls.length > 0 && ls.every(function (l) { return TR.test(l); }); }
-    /* Detect if a parsed row is a header separator (all cells are 3+ dashes) */
     function isSepRow(row) { return row.every(function (c) { return SEP_RE.test(c); }); }
+    /* Table button and highlight button are both shown on mouseup timers so
+       the selection is stable before we decide whether to show them. */
     window.addEventListener('mouseup', function (e) {
       if (document.activeElement.type !== 'textarea') return;
       setTimeout(function () {
@@ -1963,7 +1940,6 @@ a.phabricator-remarkup-embed-image img{background:white;}
       var parsed = oRange.originalText.trim().split('\n').map(function (r) {
         return r.trim().split('|').filter(function (c) { return c !== ''; }).map(function (c) { return c.trim(); });
       });
-      /* Detect and strip header separator row (row where all cells are ---+) */
       var hasHeader = false;
       if (parsed.length >= 2 && isSepRow(parsed[1])) {
         hasHeader = true;
@@ -2008,6 +1984,9 @@ a.phabricator-remarkup-embed-image img{background:white;}
         ta.rows = 1;
         ta.dataset.row = r; ta.dataset.col = c;
         ta.addEventListener('input', function () { autoSize(ta); });
+        /* Allow non-textarea targets inside table editor (td/tr wrappers) to
+           receive Tab navigation; the global keydown handler skips these since
+           they are not $.activeTA. */
         ta.addEventListener('keydown', function (e) {
           if (e.key !== 'Tab') return;
           e.preventDefault();
@@ -2052,7 +2031,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
       var colDelRow = document.createElement('tr');
       function buildColDelRow() {
         colDelRow.innerHTML = '';
-        /* Count columns from first data row (after colDelRow itself), minus the row-delete cell */
+        /* Count columns from first data row (rows[0] is colDelRow itself). */
         var firstDataRow = tbl.rows[1];
         var cc = firstDataRow ? firstDataRow.cells.length - 1 : 0;
         for (var ci = 0; ci < cc; ci++) {
@@ -2112,13 +2091,13 @@ a.phabricator-remarkup-embed-image img{background:white;}
       buildColDelRow();
       tMd.appendChild(tbl);
 
-      /* ── Auto-size after DOM insertion: widths first, then heights ── */
+      /* ── Auto-size after DOM insertion so scrollHeight is available ── */
       requestAnimationFrame(function () {
         redistributeColWidths();
         tMd.querySelectorAll('textarea').forEach(autoSize);
       });
 
-      /* ── Measure max content width per column and set proportional col widths ── */
+      /* ── Measure max content width per column, then distribute proportionally ── */
       function redistributeColWidths() {
         var dataRows = Array.from(tbl.rows).filter(function (tr) { return tr !== colDelRow; });
         if (!dataRows.length) return;
@@ -2150,8 +2129,8 @@ a.phabricator-remarkup-embed-image img{background:white;}
         }
         document.body.removeChild(ruler);
 
-        /* Set proportional widths via colgroup */
         var totalW = maxWidths.reduce(function (sum, w) { return sum + w; }, 0);
+        /* Set proportional widths via colgroup */
         var cg = tbl.querySelector('colgroup');
         if (!cg) { cg = document.createElement('colgroup'); tbl.insertBefore(cg, tbl.firstChild); }
         cg.innerHTML = '';
@@ -2284,8 +2263,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
   attachAutoMerge();
   startMinimap();
 
-  /* Auto-enter edit mode on any edit page,
-     or when an inline comment editor dialog is open */
+  /* Auto-enter edit mode on any edit page, or when an inline comment editor dialog is open */
   if (/\/edit\//.test(PAGE) ||
     document.querySelector('.jx-client-dialog .remarkup-assist-bar')) {
     document.getElementById('_PHE_EDIT').click();
