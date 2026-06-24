@@ -4,6 +4,14 @@ import sys
 from pathlib import Path
 from urllib.parse import quote
 
+# Windows consoles often default to a legacy codepage (e.g. cp950) that can't
+# encode emoji like "✏" in our own print() messages below; force UTF-8 so the
+# build's exit code reflects whether the artifacts were written, not whether
+# the terminal can display the status message.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, 'reconfigure'):
+        _stream.reconfigure(encoding='utf-8', errors='replace')
+
 
 PLUGIN_FILE = Path('plugin.js')
 BOOKMARKLET_FILE = Path('plugin-inline.js')
