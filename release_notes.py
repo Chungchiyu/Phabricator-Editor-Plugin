@@ -6,15 +6,16 @@ from pathlib import Path
 
 CHANGELOG_FILE = Path('CHANGELOG.md')
 
-INSTALL_INSTRUCTIONS = """## 安裝方式
+INSTALL_INSTRUCTIONS = """## Installation
 
-1. 下載這個 Release 附件 `install-phab-editor.bat`
-2. 雙擊執行（會跳出一個小視窗）
-3. 選擇要安裝的瀏覽器：Chrome / Edge / Firefox / All
-4. 等待安裝完成，瀏覽器可能會自動關閉再重開
-5. 開啟 Phabricator，點擊書籤列上的「✏Phab Editor {version}」即可開始使用
+1. Download this release's `install-phab-editor.bat` attachment.
+2. Double-click to run it (a small window will pop up).
+3. Choose which browser to install for: Chrome / Edge / Firefox / All.
+4. Wait for installation to finish; your browser may close and reopen automatically.
+5. Open Phabricator and click the "✏Phab Editor {version}" bookmark to start using it.
 
-找不到附件或想拿最新版？README 裡也有一個「永遠是最新版」的下載連結：
+Can't find the attachment, or want the newest version? README also has an \
+"always latest" download link:
 https://github.com/Chungchiyu/Phabricator-Editor-Plugin/releases/latest/download/install-phab-editor.bat
 """
 
@@ -40,10 +41,13 @@ def main():
     version = sys.argv[1]
     changelog = extract_changelog(version)
     if changelog is None:
-        changelog = f'_(CHANGELOG.md 裡找不到 {version} 的更新說明，請記得補上)_'
+        changelog = (
+            f'_(No changelog entry found for {version} in CHANGELOG.md '
+            f'-- please add one.)_'
+        )
 
     install = INSTALL_INSTRUCTIONS.format(version=version)
-    notes = f'## 更新內容\n\n{changelog}\n\n{install}'
+    notes = f'## What\'s Changed\n\n{changelog}\n\n{install}'
     # Write raw UTF-8 bytes so this isn't at the mercy of the console's
     # locale codepage (e.g. cp950 on Windows can't encode "⇄").
     sys.stdout.buffer.write(notes.encode('utf-8'))
