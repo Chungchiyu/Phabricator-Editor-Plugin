@@ -5,7 +5,7 @@ javascript: (function () {
   var $ = {
     active: false, lpct: 50, drag: false, mergeBase: '',
     remarkEl: null, previewEl: null, isMulti: false, backdrop: null, syncer: null,
-    activeTA: null, savedScrollY: 0, syntaxEnabled: true
+    activeTA: null, savedScrollY: 0, syntaxEnabled: true, autoPreview: true
   };
   var PAGE = window.location.href;
 
@@ -41,6 +41,13 @@ javascript: (function () {
 .ph-btn.save:hover{background:#2ecc71;border-color:#2ecc71;}
 .ph-btn.save[disabled]{background:#555;border-color:#555;color:#999;cursor:not-allowed;opacity:.6;}
 .ph-btn.save[disabled]:hover{background:#555;border-color:#555;}
+.phe-sw{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;padding:0 3px;flex-shrink:0;}
+.phe-sw input{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
+.phe-sw-track{position:relative;width:34px;height:20px;background:rgba(255,255,255,.18);border-radius:10px;transition:background .2s;flex-shrink:0;}
+.phe-sw-track::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.4);}
+.phe-sw input:checked~.phe-sw-track{background:#2980b9;}
+.phe-sw input:checked~.phe-sw-track::after{left:16px;}
+.phe-sw-lbl{font-size:11px;color:#b0bec5;white-space:nowrap;}
 .ph-btn.cancel{background:rgba(231,76,60,.7);border-color:rgba(231,76,60,.8);}
 .ph-btn.cancel:hover{background:rgba(231,76,60,.9);}
 #_PHE_DIV{cursor:col-resize;transition:background .15s;user-select:none;display:none;}
@@ -161,7 +168,10 @@ a.phabricator-remarkup-embed-image img{background:white;}
   padding:3px 9px;font-size:11.5px;color:${MMTIPCOL};
   white-space:nowrap;opacity:0;transition:opacity .15s;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}`;
+}
+#_PHE_PVUPD{position:fixed;bottom:16px;z-index:999997;padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#2980b9;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.45);transition:background .15s;}
+#_PHE_PVUPD:hover{background:#3498db;}
+`;
     document.head.appendChild(s);
   })();
 
@@ -218,6 +228,13 @@ a.phabricator-remarkup-embed-image img{background:white;}
       resize: 'none', border: 'none', outline: 'none', padding: '18px 20px', background: 'transparent',
       position: 'relative', zIndex: '2', overflowY: 'auto', display: 'block'
     });
+    positionUpdateBtn();
+  }
+  function positionUpdateBtn() {
+    var btn = document.getElementById('_PHE_PVUPD');
+    if (!btn) return;
+    var leftPx = window.innerWidth * $.lpct / 100;
+    btn.style.left = Math.max(16, leftPx - 130) + 'px';
   }
   function applyRight(preview) {
     var pt = paneTop();
@@ -575,11 +592,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
      ════════════════════════════════════════════════════════════ */
   var _pvTimer = null, _pvLastText = '';
 
-  function schedulePreviewRefresh() {
-    if (!$.active) return;
-    clearTimeout(_pvTimer);
-    _pvTimer = setTimeout(doPreviewRefresh, 50);
-  }
+  function schedulePreviewRefresh() { if (!$.active || !$.autoPreview) return; clearTimeout(_pvTimer); _pvTimer = setTimeout(doPreviewRefresh, 50); }
 
   function findPreviewBtnInContainer() {
     /* Find the preview toggle button inside the active editor container */
@@ -663,6 +676,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
     '<button id="_PHE_SYNTAX" class="ph-btn">Syntax Highlight</button>' +
     '<button id="_PHE_HALF" class="ph-btn">⇔ Half</button>' +
     '<button id="_PHE_FINDBTN" class="ph-btn">🔍 Find</button>' +
+    '<label class="phe-sw" title="Auto Preview"><input type="checkbox" id="_PHE_AUTOPREVIEW_CB" checked><span class="phe-sw-track"></span><span class="phe-sw-lbl">Auto Update</span></label>' +
     '<div class="sep"></div>' +
     '<span style="font-size:11px;color:#2ecc71;white-space:nowrap">✓ AutoMerge</span>' +
     '<div class="sp"></div>' +
@@ -685,6 +699,12 @@ a.phabricator-remarkup-embed-image img{background:white;}
   });
   document.getElementById('_PHE_CANCEL').addEventListener('click', function () {
     if (confirm('Discard all changes and reload?')) window.location.reload();
+  });
+  document.getElementById('_PHE_AUTOPREVIEW_CB').addEventListener('change', function () {
+    $.autoPreview = this.checked;
+    var updBtn = document.getElementById('_PHE_PVUPD');
+    if (updBtn) updBtn.style.display = $.autoPreview ? 'none' : 'block';
+    if ($.autoPreview && $.active) { _pvLastText = ''; schedulePreviewRefresh(); }
   });
 
   var DIV = document.createElement('div'); DIV.id = '_PHE_DIV'; document.body.appendChild(DIV);
@@ -854,6 +874,15 @@ a.phabricator-remarkup-embed-image img{background:white;}
         $.syncer = new ScrollSyncer(ta);
       }
       $.active = true;
+      /* Update button: shown only when auto-preview is OFF */
+      var _existingUpd = document.getElementById('_PHE_PVUPD');
+      if (_existingUpd) _existingUpd.parentElement.removeChild(_existingUpd);
+      var _updBtn = document.createElement('button');
+      _updBtn.id = '_PHE_PVUPD'; _updBtn.textContent = '↻ Update';
+      _updBtn.style.display = $.autoPreview ? 'none' : 'block';
+      document.body.appendChild(_updBtn);
+      positionUpdateBtn();
+      _updBtn.addEventListener('click', function () { _pvLastText = ''; doPreviewRefresh(); });
       updateSaveBtn();
       stopMinimap();
       startMinimap();
@@ -875,6 +904,8 @@ a.phabricator-remarkup-embed-image img{background:white;}
       }
       if ($.previewEl) $.previewEl.removeAttribute('style');
       if ($.backdrop && $.backdrop.parentElement) $.backdrop.parentElement.removeChild($.backdrop);
+      var _pu = document.getElementById('_PHE_PVUPD');
+      if (_pu && _pu.parentElement) _pu.parentElement.removeChild(_pu);
       $.backdrop = null; DIV.style.display = 'none';
       document.getElementById('_PHE_SYNTAX').classList.remove('on');
       if ($.isMulti) { setPreview(true); hideDialog(false); }
