@@ -801,6 +801,15 @@ a.phabricator-remarkup-embed-image img{background:white;}
       MM._up.onclick = function () { window.scrollTo({ top: 0, behavior: 'smooth' }); };
       MM._dn.onclick = function () { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); };
       window.addEventListener('scroll', updateMinimapActive);
+      /* Watch for "show older changes" loading new timeline events */
+      var timelineEl = document.querySelector('.phui-timeline-view') || document.body;
+      _mmMO = new MutationObserver(function (mutations) {
+        var hasNew = mutations.some(function (m) {
+          return Array.from(m.addedNodes).some(function (n) { return n.nodeType === 1; });
+        });
+        if (hasNew) schedRebuild(400);
+      });
+      _mmMO.observe(timelineEl, { childList: true, subtree: true });
     }
   }
 
@@ -1236,6 +1245,25 @@ a.phabricator-remarkup-embed-image img{background:white;}
         if (currentPv !== $.previewEl) $.previewEl = currentPv;
         applyRight($.previewEl);
       }
+      /* Calendar event preview pane may be replaced by Phabricator's AJAX refresh.
+         If it is, the existing _mmMO is watching a detached node and the minimap
+         stops updating.  Re-sync after the AJAX settles. */
+      setTimeout(function () {
+        var newPv = getActivePreviewEl(form);
+        if (newPv && newPv !== $.previewEl) {
+          if ($.previewEl) {
+            $.previewEl.removeAttribute('style');
+            $.previewEl.removeEventListener('scroll', updateMinimapActive);
+          }
+          $.previewEl = newPv;
+          applyRight($.previewEl);
+          $.previewEl.addEventListener('scroll', updateMinimapActive);
+          if (_mmMO) _mmMO.disconnect();
+          _mmMO = new MutationObserver(function () { schedRebuild(250); });
+          _mmMO.observe($.previewEl, { childList: true, subtree: true });
+        }
+        schedRebuild(350);
+      }, 600);
       return;
     }
 
