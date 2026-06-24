@@ -67,6 +67,11 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
     - Batch resolve with All Current, All Incoming, or All Both
     - Review the selected resolution before saving
 
+### Auto-Join
+- On the Task / Event **edit form** page, clicking Save automatically adds you to the Subscribers (Task) / Invitees (Event) field if you aren't already on it.
+- No-op if you're already subscribed/invited; never blocks Save if it can't determine this (e.g. older Phabricator/Phorge versions with a different tokenizer implementation).
+- Does not apply to comment editing or new comments — only the dedicated Task/Event edit form.
+
 ### Minimap / Table of Contents
 - A vertical **minimap** is displayed on the right side of the screen.
 - **Page mode** (non-edit mode): shows headings (h1–h6) from the description and comments with actual content from the timeline.
