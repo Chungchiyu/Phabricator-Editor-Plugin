@@ -35,6 +35,7 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 
 ### Toolbar
 - A fixed top toolbar with Logo, Edit Mode, Half/Full toggle, Find, Save, and Cancel buttons.
+- Click the logo to navigate to the Phabricator homepage.
 - **Save button** is automatically disabled when no changes have been made; enabled once content is modified.
 - The page **does not auto-enter edit mode** on load; you must click Edit Mode manually.
 - Pressing Back from comment edit mode restores the preview page and scroll position.
@@ -43,6 +44,8 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 - Full-screen / half-screen mode toggle
 - **Adjustable split pane** — drag the divider between editor and preview to resize (15%–85%)
 - **Scroll sync** — editor and preview scroll positions are synchronized
+- **Locate** — selecting text in the rendered preview highlights and scrolls to the matching source text in the editor (toggle with the "⇄ Locate" button); supports LaTeX blocks
+- **Auto Update toggle** — switch off live preview re-rendering on every keystroke and refresh manually with the floating "↻ Update" button instead (useful for long documents)
 - **Syntax highlight backdrop** — headings, bold, lists, brackets, and other Remarkup syntax are highlighted with color blocks in the editor
 - Hotkeys:
     - `Ctrl-B`: Bold
@@ -73,11 +76,16 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
     - Batch resolve with All Current, All Incoming, or All Both
     - Review the selected resolution before saving
 
+### Auto-Join
+- On the Task / Event **edit form** page, clicking Save automatically adds you to the Subscribers (Task) / Invitees (Event) field if you aren't already on it.
+- No-op if you're already subscribed/invited; never blocks Save if it can't determine this (e.g. older Phabricator/Phorge versions with a different tokenizer implementation).
+- Does not apply to comment editing or new comments — only the dedicated Task/Event edit form.
+
 ### Minimap / Table of Contents
 - A vertical **minimap** is displayed on the right side of the screen.
 - **Page mode** (non-edit mode): shows headings (h1–h6) from the description and comments with actual content from the timeline.
-- **Edit mode**: shows all headings (h1–h6) from the preview pane.
-- Hover over a minimap item to see a **tooltip** (first line of content, truncated at 20 characters with "…").
+- **Edit mode**: shows all headings (h1–h6), read from the editor's `=` syntax in document order (falls back to the rendered preview for anything not matched).
+- Hover over a minimap item to see a **tooltip** (first line of content, truncated at 20 characters with "…") and, if it has sub-headings, a **hierarchy panel** listing them — click any sub-heading to jump straight to it.
 - Click a minimap item to **smooth-scroll** to the corresponding position.
 - The **current scroll position** highlights the corresponding minimap item.
 - Right-click any minimap item to **toggle a red mark**, useful for flagging important sections.

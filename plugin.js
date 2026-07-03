@@ -1233,33 +1233,13 @@ a.phabricator-remarkup-embed-image img{background:white;}
       );
     } catch(e) { /* textarea may not be a valid scroll source in this browser */ }
   }
-
-  function findPreviewBtnInContainer() {
-    /* Find the preview toggle button inside the active editor container */
-    if (!$.remarkEl) return null;
-    var btn = $.remarkEl.querySelector('div.fa-eye');
-    return btn ? btn.parentElement : null;
-  }
-
+  function findPreviewBtnInContainer() { if (!$.remarkEl) return null; var b = $.remarkEl.querySelector('div.fa-eye'); return b ? b.parentElement : null; }
   function getActivePreviewEl(form) {
-    var livePv = form ? (form.querySelector('.remarkup-inline-preview') ||
-      form.querySelector('.phui-comment-preview-view div.phui-timeline-view') ||
-      form.querySelector('.phui-remarkup-preview')) : null;
-    return livePv || $.previewEl || null;
+    var lp = form ? (form.querySelector('.remarkup-inline-preview') || form.querySelector('.phui-comment-preview-view div.phui-timeline-view') || form.querySelector('.phui-remarkup-preview')) : null;
+    return lp || $.previewEl || null;
   }
-
-  function shouldForcePreviewToggle() {
-    return $.isMulti || /\/calendar\/event\/edit\//.test(PAGE);
-  }
-
-  function focusNoScroll(ta) {
-    if (!ta) return;
-    try {
-      ta.focus({ preventScroll: true });
-    } catch (_) {
-      ta.focus();
-    }
-  }
+  function shouldForcePreviewToggle() { return $.isMulti || /\/calendar\/event\/edit\//.test(PAGE); }
+  function focusNoScroll(ta) { if (!ta) return; try { ta.focus({ preventScroll: true }); } catch (_) { ta.focus(); } }
 
   function doPreviewRefresh() {
     if (!$.active || !$.previewEl || !$.remarkEl) return;
