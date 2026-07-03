@@ -25,6 +25,7 @@ A bookmarklet injected into Phabricator Remarkup pages, providing full-screen ed
 - Full-screen / half-screen mode toggle
 - **Adjustable split pane** — drag the divider between editor and preview to resize (15%–85%)
 - **Scroll sync** — editor and preview scroll positions are synchronized
+- **Auto Update toggle** — switch off live preview re-rendering on every keystroke and refresh manually with the floating "↻ Update" button instead (useful for long documents)
 - **Syntax highlight backdrop** — headings, bold, lists, brackets, and other Remarkup syntax are highlighted with color blocks in the editor
 - Hotkeys:
     - `Ctrl-B`: Bold
