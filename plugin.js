@@ -6,7 +6,7 @@ javascript: (function () {
   var $ = {
     active: false, lpct: 50, drag: false, mergeBase: '',
     remarkEl: null, previewEl: null, isMulti: false, backdrop: null, syncer: null,
-    activeTA: null, savedScrollY: 0, syntaxEnabled: true, autoPreview: true
+    activeTA: null, savedScrollY: 0, syntaxEnabled: true, selHighlight: null, autoPreview: true
   };
   var PAGE = window.location.href;
 
@@ -184,6 +184,13 @@ a.phabricator-remarkup-embed-image img{background:white;}
 #_PHE_HLBTN:hover{filter:brightness(1.08);transform:translateY(-1px);}
 #_PHE_PVUPD{position:fixed;bottom:16px;z-index:999997;padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#2980b9;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.45);transition:background .15s;}
 #_PHE_PVUPD:hover{background:#3498db;}
+.phe-preview-sel{background:rgba(59,130,246,.35);border-radius:2px;}
+@keyframes phe-glow-ring{
+  0%  {box-shadow:0 0 0 8px rgba(59,130,246,.65),0 0 18px 10px rgba(59,130,246,.3);}
+  60% {box-shadow:0 0 0 2px rgba(59,130,246,.3),0 0 5px 2px rgba(59,130,246,.12);}
+  100%{box-shadow:none;}
+}
+#_PHE_SEL_GLOW{position:fixed;pointer-events:none;z-index:9992;border-radius:2px;}
 `;
     document.head.appendChild(s);
   })();
@@ -288,9 +295,11 @@ a.phabricator-remarkup-embed-image img{background:white;}
     var editorDriving = false, previewDriving = false;
     var edLock = null, pvLock = null;
     var LOCK_MS = 80;
+    var _lockedBySelection = false;
+    var _selLockCleanup = null;
     function pv() { return $.previewEl; }
     ta.addEventListener('scroll', function () {
-      var p = pv(); if (!p || previewDriving) return;
+      var p = pv(); if (!p || previewDriving || _lockedBySelection) return;
       editorDriving = true; clearTimeout(edLock);
       edLock = setTimeout(function () { editorDriving = false; }, LOCK_MS);
       var r = ta.scrollTop / Math.max(1, ta.scrollHeight - ta.clientHeight);
@@ -306,12 +315,169 @@ a.phabricator-remarkup-embed-image img{background:white;}
       ta.scrollTop = r * (ta.scrollHeight - ta.clientHeight);
     }
     document.addEventListener('scroll', onPreviewScroll, true);
+    /* Lock editor→preview sync; resume automatically on next user wheel/touch scroll */
+    self.lockEditorSync = function () {
+      _lockedBySelection = true;
+      if (_selLockCleanup) { _selLockCleanup(); }
+      function unlock() { _lockedBySelection = false; _selLockCleanup = null; }
+      window.addEventListener('wheel', unlock, { capture: true, once: true });
+      window.addEventListener('touchmove', unlock, { capture: true, once: true });
+      _selLockCleanup = function () {
+        window.removeEventListener('wheel', unlock, true);
+        window.removeEventListener('touchmove', unlock, true);
+      };
+    };
     self.invalidate = function () { };
     self.destroy = function () {
       clearTimeout(edLock); clearTimeout(pvLock);
+      if (_selLockCleanup) { _selLockCleanup(); _selLockCleanup = null; }
       document.removeEventListener('scroll', onPreviewScroll, true);
     };
   }
+
+  /* ════════════════════════════════════════════════════════════
+     PREVIEW → EDITOR SELECTION SYNC
+     Selecting text in the rendered preview pane highlights the
+     corresponding text in the edit textarea.
+     ════════════════════════════════════════════════════════════ */
+  var _prevSelTimer = null;
+  var _previewSelSyncEnabled = true;
+
+  function clearPreviewSelHighlight() {
+    if ($.selHighlight) $.selHighlight.innerHTML = '';
+    var g = document.getElementById('_PHE_SEL_GLOW');
+    if (g) g.style.animation = 'none';
+  }
+
+  /* Walk text nodes of root; return cumulative char offset up to targetNode+targetOffset */
+  function getNodeTextOffset(root, targetNode, targetOffset) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    var total = 0, node;
+    while ((node = walker.nextNode())) {
+      if (node === targetNode) return total + targetOffset;
+      total += node.nodeValue.length;
+    }
+    return total;
+  }
+
+  /* Count non-overlapping occurrences of needle in haystack strictly before pos */
+  function countOccurrencesBefore(haystack, needle, pos) {
+    if (!needle) return 0;
+    var count = 0, idx = 0;
+    while ((idx = haystack.indexOf(needle, idx)) !== -1 && idx < pos) { count++; idx += needle.length; }
+    return count;
+  }
+
+  /* Return the n-th (0-based) occurrence index of needle in haystack, or -1 */
+  function nthOccurrence(haystack, needle, n) {
+    var idx = 0, count = 0;
+    while ((idx = haystack.indexOf(needle, idx)) !== -1) {
+      if (count === n) return idx;
+      count++; idx += needle.length;
+    }
+    return -1;
+  }
+
+  /* If selection is inside rendered LaTeX, return candidate raw-source strings to search in textarea */
+  function getLatexCandidates(range) {
+    var node = range.startContainer;
+    var el = node.nodeType === 3 ? node.parentElement : node;
+    if (!el || !el.closest) return null;
+    var katexEl = el.closest(
+      '.katex,.katex-display,.remarkup-latex,[data-katex-source],[data-latex],[class*="katex"]'
+    );
+    if (!katexEl) return null;
+    function mkCands(raw) {
+      var s = (raw || '').trim();
+      return s ? [s, '$' + s + '$', '$$' + s + '$$'] : null;
+    }
+    var dataAttrs = ['data-katex-source', 'data-latex', 'data-original', 'title'];
+    var cur = katexEl;
+    while (cur && cur !== $.previewEl) {
+      for (var ai = 0; ai < dataAttrs.length; ai++) {
+        var v = cur.getAttribute(dataAttrs[ai]);
+        if (v) return mkCands(v);
+      }
+      var sc = cur.querySelector(':scope > script[type^="math/"]');
+      if (sc) return mkCands(sc.textContent);
+      var mxp = cur.querySelector(':scope > .MathJax_Preview');
+      if (mxp) return mkCands(mxp.textContent);
+      cur = cur.parentElement;
+    }
+    return mkCands(katexEl.getAttribute('aria-label'));
+  }
+
+  function syncPreviewSelectionToEditor() {
+    if (!$.active || !$.previewEl || !$.activeTA || !$.selHighlight) return;
+    if (!_previewSelSyncEnabled) return;
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) { clearPreviewSelHighlight(); return; }
+    var range = sel.getRangeAt(0);
+    if (!$.previewEl.contains(range.commonAncestorContainer)) { clearPreviewSelHighlight(); return; }
+    var taValue = $.activeTA.value;
+    var idx = -1, searchText = '';
+    /* 1. LaTeX: try each candidate format against textarea */
+    var latexCands = getLatexCandidates(range);
+    if (latexCands) {
+      for (var ci = 0; ci < latexCands.length; ci++) {
+        var fi = taValue.indexOf(latexCands[ci]);
+        if (fi >= 0) { idx = fi; searchText = latexCands[ci]; break; }
+      }
+    }
+    /* 2. Regular text: use occurrence-order matching */
+    if (idx < 0) {
+      var selText = sel.toString();
+      if (!selText) { clearPreviewSelHighlight(); return; }
+      var previewText = $.previewEl.textContent;
+      var selStart = getNodeTextOffset($.previewEl, range.startContainer, range.startOffset);
+      var nth = countOccurrencesBefore(previewText, selText, selStart);
+      idx = nthOccurrence(taValue, selText, nth);
+      if (idx < 0) idx = taValue.indexOf(selText);
+      if (idx < 0) { clearPreviewSelHighlight(); return; }
+      searchText = selText;
+    }
+    var len = searchText.length;
+    function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    $.selHighlight.innerHTML =
+      esc(taValue.substring(0, idx)) +
+      '<span class="phe-preview-sel">' + esc(taValue.substring(idx, idx + len)) + '</span>' +
+      esc(taValue.substring(idx + len)).replace(/\n$/, '\n\n');
+    /* Sync selHighlight to current textarea position before checking visibility */
+    $.selHighlight.scrollTop = $.activeTA.scrollTop;
+    var span = $.selHighlight.querySelector('.phe-preview-sel');
+    if (!span) return;
+    /* If highlight is already visible in the editor viewport, don't scroll at all */
+    var taRect = $.activeTA.getBoundingClientRect();
+    var spRect = span.getBoundingClientRect();
+    var spVisible = spRect.top >= taRect.top && spRect.bottom <= taRect.bottom;
+    if (!spVisible) {
+      /* Scroll editor to show highlight; lock sync so preview pane doesn't jump */
+      if ($.syncer) $.syncer.lockEditorSync();
+      var cs = getComputedStyle($.activeTA);
+      var lh = parseFloat(cs.lineHeight) || 20;
+      var pt = parseFloat(cs.paddingTop) || 18;
+      var linesBefore = taValue.substring(0, idx).split('\n').length - 1;
+      var targetScroll = Math.max(0, linesBefore * lh + pt - $.activeTA.clientHeight * 0.35);
+      $.activeTA.scrollTop = targetScroll;
+      $.selHighlight.scrollTop = targetScroll;
+      spRect = span.getBoundingClientRect();
+    }
+    /* Glow ring: fixed-position overlay (no overflow clipping) */
+    if (spRect.width > 0 && spRect.height > 0) {
+      var g = document.getElementById('_PHE_SEL_GLOW');
+      if (!g) { g = document.createElement('div'); g.id = '_PHE_SEL_GLOW'; document.body.appendChild(g); }
+      g.style.cssText = 'position:fixed;pointer-events:none;z-index:9992;border-radius:2px;' +
+        'top:' + spRect.top + 'px;left:' + spRect.left + 'px;' +
+        'width:' + spRect.width + 'px;height:' + spRect.height + 'px;animation:none;';
+      void g.offsetWidth;
+      g.style.animation = 'phe-glow-ring 1.4s ease-out forwards';
+    }
+  }
+
+  document.addEventListener('selectionchange', function () {
+    clearTimeout(_prevSelTimer);
+    _prevSelTimer = setTimeout(syncPreviewSelectionToEditor, 80);
+  });
 
   /* ════════════════════════════════════════════════════════════
      MINIMAP TOC
@@ -782,6 +948,25 @@ a.phabricator-remarkup-embed-image img{background:white;}
 
   function schedulePreviewRefresh() { if (!$.active || !$.autoPreview) return; clearTimeout(_pvTimer); _pvTimer = setTimeout(doPreviewRefresh, 50); }
 
+  /* Attach a compositor-thread ScrollTimeline animation to #_PHE_HL so the
+     backdrop transform tracks ta.scrollTop with zero JS lag.
+     Falls back silently when ScrollTimeline is unavailable. */
+  function setupBackdropScrollAnim(ta) {
+    var hl = $.backdrop ? $.backdrop.querySelector('#_PHE_HL') : null;
+    if (!hl) return;
+    if (hl._pheBdAnim) { try { hl._pheBdAnim.cancel(); } catch(e){} hl._pheBdAnim = null; }
+    hl.style.transform = 'translateY(0px)';
+    if (typeof ScrollTimeline === 'undefined') return;
+    var maxScroll = ta.scrollHeight - ta.clientHeight;
+    if (maxScroll <= 0) return;
+    try {
+      hl._pheBdAnim = hl.animate(
+        [{ transform: 'translateY(0px)' }, { transform: 'translateY(-' + maxScroll + 'px)' }],
+        { fill: 'both', timeline: new ScrollTimeline({ source: ta, axis: 'block' }) }
+      );
+    } catch(e) { /* textarea may not be a valid scroll source in this browser */ }
+  }
+
   function findPreviewBtnInContainer() {
     /* Find the preview toggle button inside the active editor container */
     if (!$.remarkEl) return null;
@@ -913,6 +1098,7 @@ a.phabricator-remarkup-embed-image img{background:white;}
     '<button id="_PHE_SYNTAX" class="ph-btn">Syntax Highlight</button>' +
     '<button id="_PHE_HALF" class="ph-btn">⇔ Half</button>' +
     '<button id="_PHE_FINDBTN" class="ph-btn">🔍 Find</button>' +
+    '<button id="_PHE_PVSEL" class="ph-btn on">⇄ Locate</button>' +
     '<label class="phe-sw" title="Auto Preview"><input type="checkbox" id="_PHE_AUTOPREVIEW_CB" checked><span class="phe-sw-track"></span><span class="phe-sw-lbl">Auto Update</span></label>' +
     '<div class="sep"></div>' +
     '<span style="font-size:11px;color:#2ecc71;white-space:nowrap">✓ AutoMerge</span>' +
@@ -939,6 +1125,11 @@ a.phabricator-remarkup-embed-image img{background:white;}
   });
   document.getElementById('_PHE_CANCEL').addEventListener('click', function () {
     if (confirm('Discard all changes and reload?')) window.location.reload();
+  });
+  document.getElementById('_PHE_PVSEL').addEventListener('click', function () {
+    _previewSelSyncEnabled = !_previewSelSyncEnabled;
+    this.classList.toggle('on', _previewSelSyncEnabled);
+    if (!_previewSelSyncEnabled) clearPreviewSelHighlight();
   });
   document.getElementById('_PHE_AUTOPREVIEW_CB').addEventListener('change', function () {
     $.autoPreview = this.checked;
@@ -1326,16 +1517,41 @@ a.phabricator-remarkup-embed-image img{background:white;}
         }
         $.backdrop = document.createElement('div');
         $.backdrop.className = 'phe-bd';
-        $.backdrop.innerHTML = '<div id="_PHE_HL"></div>';
+        $.backdrop.innerHTML = '<div id="_PHE_HL" style="will-change:transform"></div>';
         ta.parentElement.insertBefore($.backdrop, ta);
         syncBackdropStyles(ta, $.backdrop, bars[bars.length - 1]);
+        $.selHighlight = document.createElement('div');
+        $.selHighlight.className = 'phe-bd';
+        $.selHighlight.id = '_PHE_SEL_HL';
+        ta.parentElement.insertBefore($.selHighlight, ta);
+        syncBackdropStyles(ta, $.selHighlight, bars[bars.length - 1]);
         ta.addEventListener('input', function () {
           if (!$.syntaxEnabled) return;
           var h = document.getElementById('_PHE_HL');
           if (h) h.innerHTML = hlText(ta.value);
+          setupBackdropScrollAnim(ta);
         });
         ta.dispatchEvent(new Event('input'));
-        ta.addEventListener('scroll', function () { if ($.backdrop) $.backdrop.scrollTop = ta.scrollTop; });
+        setupBackdropScrollAnim(ta);
+        ta.addEventListener('scroll', function () {
+          var st = ta.scrollTop;
+          /* Backdrop: use ScrollTimeline animation when available (compositor thread,
+             zero lag); otherwise fall back to manual transform (1-frame lag). */
+          if ($.backdrop) {
+            var _hl = $.backdrop.querySelector('#_PHE_HL');
+            if (_hl && !_hl._pheBdAnim) _hl.style.transform = 'translateY(-' + st + 'px)';
+          }
+          /* Defer layout writes to rAF so the synchronous scroll path stays
+             layout-write-free, preventing forced synchronous layout on ScrollSyncer reads. */
+          var _sh = $.selHighlight, _g = document.getElementById('_PHE_SEL_GLOW');
+          requestAnimationFrame(function () {
+            if (_sh) _sh.scrollTop = st;
+            if (_g && _sh) {
+              var sp = _sh.querySelector('.phe-preview-sel');
+              if (sp) { var r = sp.getBoundingClientRect(); _g.style.top = r.top + 'px'; _g.style.left = r.left + 'px'; }
+            }
+          });
+        });
         $.syntaxEnabled = true;
         document.getElementById('_PHE_SYNTAX').classList.add('on');
         ensureHighlightAssistButton(container, ta);
@@ -1374,11 +1590,18 @@ a.phabricator-remarkup-embed-image img{background:white;}
         }
       }
       if ($.previewEl) $.previewEl.removeAttribute('style');
-      if ($.backdrop && $.backdrop.parentElement) $.backdrop.parentElement.removeChild($.backdrop);
+      if ($.backdrop) {
+        var _hlClean = $.backdrop.querySelector('#_PHE_HL');
+        if (_hlClean && _hlClean._pheBdAnim) { try { _hlClean._pheBdAnim.cancel(); } catch(e){} }
+        if ($.backdrop.parentElement) $.backdrop.parentElement.removeChild($.backdrop);
+      }
+      if ($.selHighlight && $.selHighlight.parentElement) $.selHighlight.parentElement.removeChild($.selHighlight);
+      var _g = document.getElementById('_PHE_SEL_GLOW');
+      if (_g && _g.parentElement) _g.parentElement.removeChild(_g);
       var _pu = document.getElementById('_PHE_PVUPD');
       if (_pu && _pu.parentElement) _pu.parentElement.removeChild(_pu);
       hideHighlightFloatButton();
-      $.backdrop = null; DIV.style.display = 'none';
+      $.backdrop = null; $.selHighlight = null; DIV.style.display = 'none';
       document.getElementById('_PHE_SYNTAX').classList.remove('on');
       if ($.isMulti) { setPreview(true); hideDialog(false); }
       else setPreview(false);
